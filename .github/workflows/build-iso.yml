@@ -15,7 +15,19 @@ jobs:
       - name: Outils de construction
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential git bison flex wget cpio unzip rsync bc                                   python3 libncurses-dev file
+          sudo apt-get install -y build-essential git bison flex wget cpio unzip rsync bc python3 libncurses-dev file zip
+
+      # Garde tout ce qui a deja ete compile : la construction suivante ne refait
+      # que ce qui a change (de 1-2 h a quelques minutes).
+      - name: Cache de compilation
+        uses: actions/cache@v4
+        with:
+          path: |
+            distro/buildroot-2026.02.3/output
+            distro/buildroot-2026.02.3.tar.gz
+          key: fritax-buildroot-${{ hashFiles('distro/configs/fritax_defconfig', 'distro/board/**', 'distro/package/**', 'desktop/**') }}
+          restore-keys: |
+            fritax-buildroot-
 
       - name: Compiler Fritax Linux (tout depuis les sources)
         env:

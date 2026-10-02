@@ -11,12 +11,15 @@
 | Élément | Ce que c'est |
 |---|---|
 | **Noyau** | Linux 6.12.9 (officiel), configuré pour les vieux GPU AMD + souris/claviers |
+| **Fenêtres** | gestionnaire maison : déplacer, réduire, agrandir, redimensionner (coin), empiler, barre des tâches |
 | **Compilateur** | gcc compilé par nous, ciblé **x86-64 sans AVX2** → tourne sur le AMD A6-3400M |
 | **Bureau** | **Fritax Shell** : écrit à la main, parle **directement au matériel** (DRM/KMS). Ni X11, ni Wayland, ni Qt |
 | **Fenêtres** | déplaçables, réductibles, agrandissables, fermables, empilables (vrais bonshommes) |
 | **Terminal** | **Fritax Terminal** : moteur VT100 maison + police bitmap maison + vrai shell |
 | **Fichiers** | **Fritax Fichiers** : parcours du disque, tailles, navigation clavier/souris |
-| **Réglages** | couleur d'accent, informations du système, heure |
+| **Réglages** | **3 fonds d'écran** (Nuit / Aurore / Graphite) applicables immédiatement, couleur d'accent, informations du système, heure |
+| **Lanceur** | bouton **F** de la barre : liste les applications installées, recherche au clavier |
+| **`osh`** | l'outil de furaxdev : piloter la machine à distance sans ouvrir de port (relais HTTPS) |
 | **Bloc-notes** | saisie de texte |
 | **Icônes** | toutes **dessinées au pixel** par notre code (terminal `>_`, dossier, engrenage, feuille, extinction) |
 | **Tunnel** | **Fritax Tunnel** : notre propre tunnel (relais / exposition / connexion), authentifié par mot de passe |
@@ -26,10 +29,29 @@
 
 ## 2. Comment fabriquer l'ISO
 
+### ⭐ Le plus simple : dans le cloud (recommandé)
+
+Le dépôt **github.com/furaxdev/fritax-linux** compile l'ISO tout seul sur les
+serveurs de GitHub à chaque envoi de code. C'est **beaucoup plus rapide** que sur
+un PC :
+
+```
+GitHub → ton dépôt → onglet « Actions » → la dernière exécution
+   → section « Artifacts » → télécharge « fritax-linux-1.0-nova »
+```
+
+*(Tu peux aussi la lancer à la main : onglet Actions → « Construire l'ISO Fritax
+Linux » → bouton « Run workflow ».)*
+
+### Sur ta machine (Ubuntu)
+
 ```sh
 cd distro
 ./build.sh          # 1 h à 3 h la première fois (il compile le compilateur)
 ```
+
+Sur un petit PC, prévois de la patience : la première construction compile le
+compilateur lui-même. Les suivantes ne prennent que quelques minutes.
 
 À la fin tu obtiens :
 
