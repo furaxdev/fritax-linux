@@ -3,6 +3,12 @@
 #  Tout est compile depuis les sources : noyau, compilateur
 #  (toolchain), systeme de base, nos paquets. Aucun remaster.
 #  Cible : AMD A6-3400M (K10, 2011) -> x86-64 de base, sans AVX2
+#
+#  ⚠️ ORDRE IMPORTANT : les options qui dependent d'une autre doivent venir
+#  APRES elle. En particulier « en-tetes du noyau comme le noyau » vit dans
+#  un bloc « if BR2_LINUX_KERNEL » de linux/Config.in : si le noyau est
+#  active plus bas, l'option est ignoree EN SILENCE et Buildroot retombe
+#  sur des en-tetes 2.6 -> glibc impossible -> uclibc -> echec du build.
 # ============================================================
 
 # --- architecture : x86-64 le plus compatible possible ---
@@ -10,9 +16,19 @@ BR2_x86_64=y
 BR2_x86_generic=y
 BR2_OPTIMIZE_2=y
 
-# --- compilateur compile par nous ---
-# ⚠️ INDISPENSABLE : sans cette ligne, Buildroot reste sur des en-tetes 2.6,
-# glibc devient INDISPONIBLE (il exige >= 3.2) et l'outil retombe en uclibc.
+# --- noyau Linux : pris tel quel (kernel officiel), configure par nous ---
+BR2_LINUX_KERNEL=y
+BR2_LINUX_KERNEL_CUSTOM_VERSION=y
+BR2_LINUX_KERNEL_CUSTOM_VERSION_VALUE="6.12.9"
+BR2_LINUX_KERNEL_USE_DEFCONFIG=y
+BR2_LINUX_KERNEL_DEFCONFIG="x86_64"
+BR2_LINUX_KERNEL_CONFIG_FRAGMENT_FILES="board/fritax/kernel.fragment"
+BR2_LINUX_KERNEL_ZIMAGE=y
+BR2_LINUX_KERNEL_INSTALL_TARGET=y
+BR2_LINUX_KERNEL_NEEDS_HOST_OPENSSL=y
+BR2_LINUX_KERNEL_NEEDS_HOST_LIBELF=y
+
+# --- compilateur compile par nous (APRES le noyau : voir l'avertissement) ---
 BR2_KERNEL_HEADERS_AS_KERNEL=y
 BR2_TOOLCHAIN_BUILDROOT_GLIBC=y
 BR2_TOOLCHAIN_BUILDROOT_CXX=y
@@ -27,18 +43,6 @@ BR2_SYSTEM_DHCP="eth0"
 
 # --- fichiers propres a la distribution ---
 BR2_ROOTFS_OVERLAY="board/fritax/rootfs-overlay"
-
-# --- noyau Linux : pris tel quel (kernel officiel), configure par nous ---
-BR2_LINUX_KERNEL=y
-BR2_LINUX_KERNEL_CUSTOM_VERSION=y
-BR2_LINUX_KERNEL_CUSTOM_VERSION_VALUE="6.12.9"
-BR2_LINUX_KERNEL_USE_DEFCONFIG=y
-BR2_LINUX_KERNEL_DEFCONFIG="x86_64"
-BR2_LINUX_KERNEL_CONFIG_FRAGMENT_FILES="board/fritax/kernel.fragment"
-BR2_LINUX_KERNEL_ZIMAGE=y
-BR2_LINUX_KERNEL_INSTALL_TARGET=y
-BR2_LINUX_KERNEL_NEEDS_HOST_OPENSSL=y
-BR2_LINUX_KERNEL_NEEDS_HOST_LIBELF=y
 
 # --- userland que NOUS choisissons ---
 BR2_PACKAGE_BASH=y
@@ -64,8 +68,6 @@ BR2_PACKAGE_FRITAX_TUNNEL=y
 # --- image finale : ISO bootable (BIOS classique, comme le PC de Fritax) ---
 BR2_TARGET_SYSLINUX=y
 BR2_TARGET_SYSLINUX_ISOLINUX=y
-# (les images ext2/squashfs ne servent pas : l'ISO embarque son systeme en CPIO,
-#  selectionne automatiquement par ISO9660_INITRD ci-dessous)
 BR2_TARGET_ROOTFS_ISO9660=y
 BR2_TARGET_ROOTFS_ISO9660_ISOLINUX=y
 BR2_TARGET_ROOTFS_ISO9660_BOOT_MENU="board/fritax/isolinux.cfg"

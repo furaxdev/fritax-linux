@@ -29,6 +29,18 @@ jobs:
           restore-keys: |
             fritax-buildroot-
 
+      - name: Verifier la configuration retenue
+        run: |
+          cd distro
+          [ -d buildroot-2026.02.3 ] || { curl -sL -o br.tar.gz https://buildroot.org/downloads/buildroot-2026.02.3.tar.gz && tar xzf br.tar.gz; }
+          cd buildroot-2026.02.3
+          make BR2_EXTERNAL=.. fritax_defconfig >/dev/null 2>&1 || true
+          echo "--- bibliotheque C / en-tetes retenus ---"
+          grep -E '^BR2_(TOOLCHAIN_BUILDROOT_(GLIBC|UCLIBC|MUSL)|KERNEL_HEADERS_AS_KERNEL|DEFAULT_KERNEL_HEADERS|LINUX_KERNEL)=' .config || echo "  (aucune)"
+          grep -E '^BR2_TOOLCHAIN_HEADERS_AT_LEAST_' .config | head -5 || true
+          echo "--- paquets fritax ---"
+          grep -cE '^BR2_PACKAGE_FRITAX_[A-Z]+=y' .config
+
       - name: Compiler Fritax Linux (tout depuis les sources)
         env:
           JOBS: "4"
