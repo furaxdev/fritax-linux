@@ -1,0 +1,72 @@
+# ============================================================
+#  FRITAX LINUX 1.0 "Nova" - configuration de construction
+#  Tout est compile depuis les sources : noyau, compilateur
+#  (toolchain), systeme de base, nos paquets. Aucun remaster.
+#  Cible : AMD A6-3400M (K10, 2011) -> x86-64 de base, sans AVX2
+# ============================================================
+
+# --- architecture : x86-64 le plus compatible possible ---
+BR2_x86_64=y
+BR2_x86_generic=y
+BR2_OPTIMIZE_2=y
+
+# --- compilateur compile par nous ---
+BR2_TOOLCHAIN_BUILDROOT_GLIBC=y
+BR2_TOOLCHAIN_BUILDROOT_CXX=y
+
+# --- identite du systeme ---
+BR2_TARGET_GENERIC_HOSTNAME="fritax-linux"
+BR2_TARGET_GENERIC_ISSUE="Fritax Linux 1.0 (Nova) - tape 'help'"
+BR2_TARGET_GENERIC_ROOT_PASSWD="fritax"
+BR2_SYSTEM_BIN_SH_BASH=y
+BR2_TARGET_GENERIC_GETTY_PORT="tty1"
+BR2_SYSTEM_DHCP="eth0"
+
+# --- fichiers propres a la distribution ---
+BR2_ROOTFS_OVERLAY="board/fritax/rootfs-overlay"
+
+# --- noyau Linux : pris tel quel (kernel officiel), configure par nous ---
+BR2_LINUX_KERNEL=y
+BR2_LINUX_KERNEL_CUSTOM_VERSION=y
+BR2_LINUX_KERNEL_CUSTOM_VERSION_VALUE="6.12.9"
+BR2_LINUX_KERNEL_USE_DEFCONFIG=y
+BR2_LINUX_KERNEL_DEFCONFIG="x86_64"
+BR2_LINUX_KERNEL_CONFIG_FRAGMENT_FILES="board/fritax/kernel.fragment"
+BR2_LINUX_KERNEL_ZIMAGE=y
+BR2_LINUX_KERNEL_INSTALL_TARGET=y
+BR2_LINUX_KERNEL_NEEDS_HOST_OPENSSL=y
+BR2_LINUX_KERNEL_NEEDS_HOST_LIBELF=y
+
+# --- userland que NOUS choisissons ---
+BR2_PACKAGE_BASH=y
+BR2_PACKAGE_BUSYBOX_SHOW_OTHERS=y
+BR2_PACKAGE_COREUTILS=y
+BR2_PACKAGE_NANO=y
+BR2_PACKAGE_HTOP=y
+BR2_PACKAGE_GIT=y
+BR2_PACKAGE_KMOD=y
+BR2_PACKAGE_UTIL_LINUX=y
+BR2_PACKAGE_UTIL_LINUX_BINARIES=y
+BR2_PACKAGE_USBUTILS=y
+BR2_PACKAGE_E2FSPROGS=y
+BR2_PACKAGE_DOSFSTOOLS=y
+
+# --- NOS paquets (c'est ca, une distribution) ---
+BR2_PACKAGE_FRITAX_BRANDING=y
+BR2_PACKAGE_FRITAX_SHELL=y
+BR2_PACKAGE_FRITAX_TERMINAL=y
+BR2_PACKAGE_FRITAX_FILES=y
+BR2_PACKAGE_FRITAX_TUNNEL=y
+
+# --- image finale : ISO bootable (BIOS classique, comme le PC de Fritax) ---
+BR2_TARGET_SYSLINUX=y
+BR2_TARGET_SYSLINUX_ISOLINUX=y
+BR2_TARGET_ROOTFS_EXT2=y
+BR2_TARGET_ROOTFS_EXT2_4=y
+BR2_TARGET_ROOTFS_EXT2_SIZE="700M"
+BR2_TARGET_ROOTFS_SQUASHFS=y
+BR2_TARGET_ROOTFS_ISO9660=y
+BR2_TARGET_ROOTFS_ISO9660_ISOLINUX=y
+BR2_TARGET_ROOTFS_ISO9660_BOOT_MENU="board/fritax/isolinux.cfg"
+BR2_TARGET_ROOTFS_ISO9660_INITRD=y
+BR2_TARGET_ROOTFS_ISO9660_HYBRID=y

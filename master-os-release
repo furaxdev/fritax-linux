@@ -1,0 +1,8 @@
+PRETTY_NAME="Fritax Linux 1.0 (Nova)"
+NAME="Fritax Linux"
+VERSION_ID="1.0"
+VERSION="1.0 (Nova)"
+VERSION_CODENAME=nova
+ID=fritax
+ID_LIKE=ubuntu debian
+HOME_URL="https://github.com/furaxdev/fritax-linux"

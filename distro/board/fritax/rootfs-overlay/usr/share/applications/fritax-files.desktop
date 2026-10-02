@@ -1,0 +1,6 @@
+[Desktop Entry]
+Type=Application
+Name=Fichiers
+Exec=/usr/bin/fritax-open fichiers
+Terminal=false
+Categories=Utility;

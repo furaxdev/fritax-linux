@@ -1,0 +1,6 @@
+[Desktop Entry]
+Type=Application
+Name=Redémarrer
+Exec=/sbin/reboot
+Terminal=false
+Categories=Utility;

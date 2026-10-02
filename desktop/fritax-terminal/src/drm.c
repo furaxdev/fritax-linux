@@ -1,0 +1,125 @@
+/* Fritax - implementation DRM/KMS (ioctls du noyau uniquement) */
+#define _GNU_SOURCE
+#include "drm.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <errno.h>
+#include <stdarg.h>
+#include <sys/ioctl.h>
+#include <sys/mman.h>
+#include <linux/types.h>
+#include <drm/drm.h>
+#include <drm/drm_mode.h>
+#include <drm/drm_fourcc.h>
+
+struct FXDrm {
+    int fd;
+    uint32_t conn_id, crtc_id;
+    struct drm_mode_modeinfo mode;
+    int w, h;
+};
+
+static FILE *GLOG;
+void fx_drm_log_path(const char *p) { if (p) GLOG = fopen(p, "w"); }
+static void logf_(const char *fmt, ...) {
+    if (!GLOG) return;
+    va_list ap; va_start(ap, fmt); vfprintf(GLOG, fmt, ap); va_end(ap); fputc('\n', GLOG); fflush(GLOG);
+}
+
+FXDrm *fx_drm_open(const char *card) {
+    FXDrm *d = calloc(1, sizeof(FXDrm));
+    if (!d) return NULL;
+    d->fd = open(card, O_RDWR | O_CLOEXEC);
+    if (d->fd < 0) { logf_("ouverture %s : %s", card, strerror(errno)); free(d); return NULL; }
+
+    struct drm_mode_card_res res;
+    memset(&res, 0, sizeof res);
+    if (ioctl(d->fd, DRM_IOCTL_MODE_GETRESOURCES, &res)) { logf_("GETRESOURCES: %s", strerror(errno)); goto fail; }
+    uint32_t *conns = calloc(res.count_connectors ? res.count_connectors : 1, sizeof(uint32_t));
+    uint32_t *crtcs = calloc(res.count_crtcs ? res.count_crtcs : 1, sizeof(uint32_t));
+    uint32_t *encs  = calloc(res.count_encoders ? res.count_encoders : 1, sizeof(uint32_t));
+    uint32_t *fbs   = calloc(res.count_fbs ? res.count_fbs : 1, sizeof(uint32_t));
+    res.connector_id_ptr = (uint64_t)(uintptr_t)conns;
+    res.crtc_id_ptr      = (uint64_t)(uintptr_t)crtcs;
+    res.encoder_id_ptr   = (uint64_t)(uintptr_t)encs;
+    res.fb_id_ptr        = (uint64_t)(uintptr_t)fbs;
+    if (ioctl(d->fd, DRM_IOCTL_MODE_GETRESOURCES, &res)) { logf_("GETRESOURCES(2): %s", strerror(errno)); goto fail2; }
+
+    for (uint32_t i = 0; i < res.count_connectors; i++) {
+        struct drm_mode_get_connector conn;
+        memset(&conn, 0, sizeof conn);
+        conn.connector_id = conns[i];
+        if (ioctl(d->fd, DRM_IOCTL_MODE_GETCONNECTOR, &conn)) continue;
+        struct drm_mode_modeinfo *modes = calloc(conn.count_modes ? conn.count_modes : 1, sizeof *modes);
+        uint32_t *cencs = calloc(conn.count_encoders ? conn.count_encoders : 1, sizeof(uint32_t));
+        uint32_t *props = calloc(conn.count_props ? conn.count_props : 1, sizeof(uint32_t));
+        uint64_t *pvals = calloc(conn.count_props ? conn.count_props : 1, sizeof(uint64_t));
+        conn.modes_ptr = (uint64_t)(uintptr_t)modes;
+        conn.encoders_ptr = (uint64_t)(uintptr_t)cencs;
+        conn.props_ptr = (uint64_t)(uintptr_t)props;
+        conn.prop_values_ptr = (uint64_t)(uintptr_t)pvals;
+        int r = ioctl(d->fd, DRM_IOCTL_MODE_GETCONNECTOR, &conn);
+        if (r == 0 && conn.connection == 1 && conn.count_modes > 0) {
+            d->conn_id = conn.connector_id;
+            memcpy(&d->mode, &modes[0], sizeof d->mode);
+            uint32_t eid = conn.encoder_id ? conn.encoder_id : (conn.count_encoders ? cencs[0] : 0);
+            struct drm_mode_get_encoder enc; memset(&enc, 0, sizeof enc); enc.encoder_id = eid;
+            ioctl(d->fd, DRM_IOCTL_MODE_GETENCODER, &enc);
+            d->crtc_id = enc.crtc_id ? enc.crtc_id : (res.count_crtcs ? crtcs[0] : 0);
+            free(modes); free(cencs); free(props); free(pvals);
+            break;
+        }
+        free(modes); free(cencs); free(props); free(pvals);
+    }
+    free(conns); free(crtcs); free(encs); free(fbs);
+    if (!d->crtc_id) { logf_("aucun ecran connecte"); goto fail; }
+    d->w = (int)d->mode.hdisplay; d->h = (int)d->mode.vdisplay;
+    logf_("ecran %dx%d @ %uHz (crtc %u)", d->w, d->h, d->mode.vrefresh, d->crtc_id);
+    return d;
+fail2:
+    free(conns); free(crtcs); free(encs); free(fbs);
+fail:
+    close(d->fd); free(d); return NULL;
+}
+
+void fx_drm_close(FXDrm *d) { if (d) { if (d->fd >= 0) close(d->fd); free(d); } }
+int fx_drm_width(FXDrm *d) { return d->w; }
+int fx_drm_height(FXDrm *d) { return d->h; }
+int fx_drm_fd(FXDrm *d) { return d->fd; }
+
+FXDrmBuf *fx_drm_buf_new(FXDrm *d) {
+    FXDrmBuf *b = calloc(1, sizeof(FXDrmBuf));
+    if (!b) return NULL;
+    struct drm_mode_create_dumb cd; memset(&cd, 0, sizeof cd);
+    cd.width = (uint32_t)d->w; cd.height = (uint32_t)d->h; cd.bpp = 32;
+    if (ioctl(d->fd, DRM_IOCTL_MODE_CREATE_DUMB, &cd)) { logf_("CREATE_DUMB: %s", strerror(errno)); free(b); return NULL; }
+    b->handle = cd.handle; b->pitch = cd.pitch; b->size = cd.size;
+    struct drm_mode_fb_cmd fc; memset(&fc, 0, sizeof fc);
+    fc.width = (uint32_t)d->w; fc.height = (uint32_t)d->h; fc.pitch = b->pitch; fc.bpp = 32; fc.depth = 24;
+    fc.handle = b->handle;
+    if (ioctl(d->fd, DRM_IOCTL_MODE_ADDFB, &fc)) { logf_("ADDFB: %s", strerror(errno)); free(b); return NULL; }
+    b->fb_id = fc.fb_id;
+    struct drm_mode_map_dumb md; memset(&md, 0, sizeof md); md.handle = b->handle;
+    if (ioctl(d->fd, DRM_IOCTL_MODE_MAP_DUMB, &md)) { logf_("MAP_DUMB: %s", strerror(errno)); free(b); return NULL; }
+    b->map = mmap(NULL, b->size, PROT_READ | PROT_WRITE, MAP_SHARED, d->fd, (off_t)md.offset);
+    if (b->map == MAP_FAILED) { logf_("mmap: %s", strerror(errno)); free(b); return NULL; }
+    return b;
+}
+
+int fx_drm_buf_flip(FXDrm *d, FXDrmBuf *b) {
+    struct drm_mode_crtc c; memset(&c, 0, sizeof c);
+    c.crtc_id = d->crtc_id; c.fb_id = b->fb_id;
+    c.set_connectors_ptr = (uint64_t)(uintptr_t)&d->conn_id; c.count_connectors = 1;
+    c.mode = d->mode; c.mode_valid = 1;
+    if (ioctl(d->fd, DRM_IOCTL_MODE_SETCRTC, &c)) { logf_("SETCRTC: %s", strerror(errno)); return -1; }
+    return 0;
+}
+
+void fx_drm_wait_vblank(FXDrm *d) {
+    union drm_wait_vblank wv; memset(&wv, 0, sizeof wv);
+    wv.request.type = _DRM_VBLANK_RELATIVE; wv.request.sequence = 1;
+    ioctl(d->fd, DRM_IOCTL_WAIT_VBLANK, &wv);
+}

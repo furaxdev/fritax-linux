@@ -1,0 +1,6 @@
+[Desktop Entry]
+Type=Application
+Name=Bloc-notes
+Exec=/usr/bin/fritax-open bloc
+Terminal=false
+Categories=Utility;

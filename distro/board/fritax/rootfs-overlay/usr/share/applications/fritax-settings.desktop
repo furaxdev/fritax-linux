@@ -1,0 +1,6 @@
+[Desktop Entry]
+Type=Application
+Name=Réglages
+Exec=/usr/bin/fritax-open reglages
+Terminal=false
+Categories=Utility;

@@ -1,0 +1,79 @@
+#!/usr/bin/env bash
+# ============================================================
+#  osh - OpenConnect Shell
+#  Le relais d'origine (Supabase) a ete supprime : cette version
+#  passe par ntfy.sh. Meme interface, meme secret, aucun port ouvert.
+#
+#  Usage :
+#    osh --ip=monpc@furax "ls -la ~"
+#    osh --ip=monpc@furax --password=MonSecret "./script.sh"
+#    osh --ip=monpc@furax              # mode interactif
+# ============================================================
+set -uo pipefail
+
+ICI="$(cd "$(dirname "$0")" && pwd)"
+CLIENT="$ICI/client.py"
+C_RESET='\033[0m'; C_CYAN='\033[0;36m'; C_GREEN='\033[0;32m'
+C_YELLOW='\033[1;33m'; C_RED='\033[0;31m'; C_BOLD='\033[1m'
+
+usage() {
+  echo -e "
+  ${C_BOLD}osh${C_RESET} - OpenConnect Shell (relais HTTPS, sans ngrok ni SSH)
+
+  ${C_CYAN}Usage :${C_RESET}
+    osh --ip={hote}@{user} [--password={secret}] [commande]
+    osh --ip={hote}@{user} [--password={secret}]        # shell interactif
+
+  ${C_CYAN}Exemples :${C_RESET}
+    osh --ip=monpc@furax \"ls -la ~\"
+    osh --ip=monpc@furax --password=MonSecret \"htop\"
+"
+  exit 1
+}
+
+IP_USER=""; PASSWORD=""; CMD=""
+for arg in "$@"; do
+  case "$arg" in
+    --ip=*)       IP_USER="${arg#--ip=}"        ;;
+    --password=*) PASSWORD="${arg#--password=}" ;;
+    --help|-h)    usage ;;
+    -*)           echo "Option inconnue : $arg" >&2; usage ;;
+    *)            CMD="$arg" ;;
+  esac
+done
+[ -z "$IP_USER" ] && usage
+
+HOST="${IP_USER%%@*}"
+USER_PART="${IP_USER##*@}"
+[ "$HOST" = "$IP_USER" ] && USER_PART="?"
+
+if [ -z "$PASSWORD" ]; then
+  echo -ne "  ${C_CYAN}${USER_PART}@${HOST}${C_RESET} - secret : "
+  read -rs PASSWORD; echo ""
+fi
+[ -z "$PASSWORD" ] && { echo "  ${C_RED}secret vide${C_RESET}"; exit 1; }
+
+if ! command -v python3 >/dev/null 2>&1 || [ ! -f "$CLIENT" ]; then
+  echo "  ${C_RED}il manque python3 ou $CLIENT${C_RESET}"; exit 1
+fi
+
+envoyer() {
+  python3 "$CLIENT" --secret "$PASSWORD" --timeout 300 "$1"
+}
+
+if [ -n "$CMD" ]; then
+  echo -e "  ${C_GREEN}${USER_PART}@${HOST}${C_RESET} ${C_YELLOW}${CMD}${C_RESET}"
+  envoyer "$CMD"
+  exit $?
+fi
+
+echo -e "  ${C_BOLD}osh${C_RESET} - ${C_GREEN}${USER_PART}@${HOST}${C_RESET} connecte (Ctrl+D pour quitter)"
+while true; do
+  echo -ne "${C_CYAN}${USER_PART}@${HOST}${C_RESET}$ "
+  IFS= read -r ligne || break
+  [ -z "$ligne" ] && continue
+  [ "$ligne" = "exit" ] && break
+  [ "$ligne" = "quit" ] && break
+  envoyer "$ligne"
+done
+echo -e "  ${C_YELLOW}deconnecte${C_RESET}"

@@ -1,0 +1,6 @@
+config BR2_PACKAGE_FRITAX_SHELL
+	bool "fritax-shell"
+	help
+	  Le bureau de Fritax Linux : barre flottante arrondie,
+	  lanceur d'applications et horloge. Parle directement au
+	  materiel (DRM/KMS) : ni serveur graphique, ni bibliotheque.

@@ -1,0 +1,31 @@
+#!/bin/sh
+# Fritax Linux : demarrage du bureau Fritax Shell (DRM/KMS)
+# Le bureau parle directement au materiel : ni X11, ni Wayland.
+case "$1" in
+  start)
+    printf "Demarrage du bureau Fritax...\n"
+    if [ -e /dev/dri/card0 ]; then
+      # boucle de surveillance : si le bureau se ferme, il revient tout seul
+      # (Echap = redemarrer le bureau ; pour eteindre, utilise "Eteindre" dans le lanceur)
+      (
+        while true; do
+          /usr/bin/fritax-shell >>/var/log/fritax-shell.log 2>&1
+          [ -e /tmp/fritax-stop ] && break
+          printf "  (le bureau s'est arrete, redemarrage dans 2 secondes)\n" >>/var/log/fritax-shell.log
+          sleep 2
+        done
+      ) &
+    else
+      printf "  (pas de carte graphique DRM : bureau non lance)\n"
+    fi
+    ;;
+  stop)
+    touch /tmp/fritax-stop
+    killall fritax-shell 2>/dev/null || true
+    rm -f /tmp/fritax-stop
+    ;;
+  restart|reload)
+    "$0" stop; sleep 1; "$0" start
+    ;;
+esac
+exit 0

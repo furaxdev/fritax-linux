@@ -1,0 +1,7 @@
+config BR2_PACKAGE_FRITAX_TERMINAL
+	bool "fritax-terminal"
+	help
+	  Le terminal maison de Fritax Linux. Deux variantes :
+	  native (DRM/KMS, pour la distribution) et X11 (pour
+	  tester depuis un bureau existant). Moteur VT100/xterm
+	  ecrit de zero, police bitmap integree, aucune dependance.

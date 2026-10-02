@@ -1,0 +1,6 @@
+config BR2_PACKAGE_FRITAX_TUNNEL
+	bool "fritax-tunnel"
+	help
+	  Notre propre tunnel TCP avec mot de passe (relais, exposition
+	  d'un service local, connexion). Permet d'atteindre un PC
+	  derriere une box sans redirection de port. Ecrit de zero.

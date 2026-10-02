@@ -1,0 +1,6 @@
+[Desktop Entry]
+Type=Application
+Name=Éteindre
+Exec=/sbin/poweroff
+Terminal=false
+Categories=Utility;

@@ -1,0 +1,6 @@
+[Desktop Entry]
+Type=Application
+Name=Terminal
+Exec=/usr/bin/fritax-open terminal
+Terminal=false
+Categories=Utility;

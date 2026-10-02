@@ -1,0 +1,6 @@
+config BR2_PACKAGE_FRITAX_FILES
+	bool "fritax-files"
+	help
+	  Le gestionnaire de fichiers de Fritax Linux.
+	  Ecrit a la main (aucune bibliotheque graphique) : moteur DRM/KMS
+	  pour la distribution, moteur X11 pour les tests.

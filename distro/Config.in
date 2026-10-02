@@ -1,0 +1,5 @@
+source "$BR2_EXTERNAL_FRITAX_LINUX_PATH/package/fritax-branding/Config.in"
+source "$BR2_EXTERNAL_FRITAX_LINUX_PATH/package/fritax-shell/Config.in"
+source "$BR2_EXTERNAL_FRITAX_LINUX_PATH/package/fritax-files/Config.in"
+source "$BR2_EXTERNAL_FRITAX_LINUX_PATH/package/fritax-terminal/Config.in"
+source "$BR2_EXTERNAL_FRITAX_LINUX_PATH/package/fritax-tunnel/Config.in"

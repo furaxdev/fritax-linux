@@ -1,0 +1,6 @@
+config BR2_PACKAGE_FRITAX_BRANDING
+	bool "fritax-branding"
+	help
+	  L'identite visuelle et les reglages de Fritax Linux :
+	  os-release, message d'accueil, fond d'ecran, banniere de
+	  demarrage et reglages systeme propres a la distribution.

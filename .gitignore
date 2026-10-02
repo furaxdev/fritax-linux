@@ -1,0 +1,19 @@
+# Buildroot telecharge / compile (jamais dans le depot)
+distro/buildroot-*/
+distro/buildroot-*.tar.gz
+distro/*.iso
+distro/output/
+
+# fichiers temporaires de compilation
+*.o
+*.a
+__pycache__/
+*.pyc
+
+# rendus d'apercu
+*.ppm
+/tmp/
+
+# divers
+.DS_Store
+*.log
