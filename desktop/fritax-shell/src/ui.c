@@ -29,7 +29,7 @@ typedef struct { pid_t pid; char name[80]; uint32_t color; } Running;
 
 static App apps[128]; static int napps;
 static Running run_apps[32]; static int nrunning;
-static int launcher_open, hover = -1, hover_btn, filter_len, wants_close;
+static int launcher_open, hover = -1, hover_btn, filter_len, wants_close, sel_tile;
 static char filter[32];
 static int SW, SH;
 static int visible_apps[128], nvisible;
@@ -221,7 +221,12 @@ static void draw_launcher(FXScreen *s) {
     for (int i = 0; i < nvisible; i++) {
         int col = i % 3, row = i / 3;
         int tx = lx + 22 + col * (TILE_W + GRID_GAP), ty = ly + 56 + row * (TILE_H + GRID_GAP);
-        fx_fill_round_rect(s, tx, ty, TILE_W, TILE_H, 16, hover == i ? 0x25344C : C_TILE);
+        int choisi = (i == sel_tile);
+        fx_fill_round_rect(s, tx, ty, TILE_W, TILE_H, 16,
+                           choisi ? 0x2C3E5C : (hover == i ? 0x25344C : C_TILE));
+        if (choisi) {                                   /* la tuile selectionnee est entouree */
+            fx_fill_rect(s, tx + 12, ty + TILE_H - 4, TILE_W - 24, 3, C_CYAN);
+        }
         int kind = fx_app_kind(apps[visible_apps[i]].name);
         if (kind != FX_ICON_GENERIC) {
             fx_app_icon(s, tx + 18, ty + 14, 44, kind);
@@ -234,11 +239,11 @@ static void draw_launcher(FXScreen *s) {
         snprintf(nm, sizeof nm, "%.18s", apps[visible_apps[i]].name);
         fx_draw_text(s, tx + 16, ty + 66, nm, C_FG);
     }
-    if (!nvisible) fx_draw_text(s, lx + 24, ly + 70, "aucune application trouvee", C_DIM);
+    if (!nvisible) fx_draw_text(s, lx + 24, ly + 70, "aucune application trouv\351e", C_DIM);
 
     char hint[96];
-    if (filter_len) snprintf(hint, sizeof hint, "recherche : %s_   |   Echap : fermer", filter);
-    else snprintf(hint, sizeof hint, "tape pour chercher   |   Echap : fermer");
+    if (filter_len) snprintf(hint, sizeof hint, "recherche : %s_   |   \311chap : fermer", filter);
+    else snprintf(hint, sizeof hint, "tape pour chercher   |   \311chap : fermer");
     fx_draw_text(s, lx + 22, ly + lh - 28, hint, C_DIM);
 }
 
@@ -299,7 +304,22 @@ void fx_ui_apercu_appli(const char *name, uint32_t color) {
     nrunning++;
 }
 
-void fx_ui_set_launcher(int open) { launcher_open = open; dirty = 1; }
+void fx_ui_set_launcher(int open) { launcher_open = open; sel_tile = 0; dirty = 1; }
+
+/* deplace la selection dans la grille du lanceur (3 colonnes) */
+static void tile_move(int dx, int dy) {
+    compute_visible();
+    if (nvisible <= 0) { sel_tile = 0; return; }
+    int col = sel_tile % 3, row = sel_tile / 3;
+    col += dx; row += dy;
+    if (col < 0) col = 2;
+    if (col > 2) col = 0;
+    if (row < 0) row = (nvisible - 1) / 3;
+    int idx = row * 3 + col;
+    while (idx >= nvisible && idx > 0) idx--;
+    sel_tile = idx < 0 ? 0 : idx;
+    dirty = 1;
+}
 int  fx_ui_launcher_open(void) { return launcher_open; }
 int  fx_ui_wants_close(void) { return wants_close; }
 
@@ -333,6 +353,11 @@ int fx_ui_click(int x, int y) {
             int col = i % 3, row = i / 3;
             int tx = lx + 22 + col * (TILE_W + GRID_GAP), ty = ly + 56 + row * (TILE_H + GRID_GAP);
             if (x >= tx && x <= tx + TILE_W && y >= ty && y <= ty + TILE_H) { launch(visible_apps[i]); return 0; }
+        }
+        for (int i = 0; i < nvisible; i++) {
+            int col = i % 3, row = i / 3;
+            int tx = lx + 22 + col * (TILE_W + GRID_GAP), ty = ly + 56 + row * (TILE_H + GRID_GAP);
+            if (x >= tx && x <= tx + TILE_W && y >= ty && y <= ty + TILE_H) { sel_tile = i; return 0; }
         }
         if (x < lx || x > lx + lw || y < ly || y > ly + lh) {
             launcher_open = 0; filter_len = 0; filter[0] = 0; dirty = 1;
@@ -390,8 +415,17 @@ int fx_ui_key(int key, int ascii) {
     } else if (key == UI_KEY_SUPER) {
         launcher_open = !launcher_open; filter_len = 0; filter[0] = 0; dirty = 1;
     } else if (launcher_open) {
-        if (key == UI_KEY_BACKSPACE) { if (filter_len) filter[--filter_len] = 0; dirty = 1; }
-        else if (ascii >= 32 && ascii < 127 && filter_len < 24) { filter[filter_len++] = (char)ascii; filter[filter_len] = 0; dirty = 1; }
+        compute_visible();
+        if (key == UI_KEY_BACKSPACE) { if (filter_len) filter[--filter_len] = 0; dirty = 1; sel_tile = 0; }
+        else if (key == UI_KEY_DOWN) tile_move(0, 1);
+        else if (key == UI_KEY_UP) tile_move(0, -1);
+        else if (key == UI_KEY_RIGHT) tile_move(1, 0);
+        else if (key == UI_KEY_LEFT) tile_move(-1, 0);
+        else if (key == UI_KEY_TAB) tile_move(1, 0);
+        else if (key == UI_KEY_ENTER) {
+            if (sel_tile >= 0 && sel_tile < nvisible) launch(visible_apps[sel_tile]);
+        }
+        else if (ascii >= 32 && ascii < 127 && filter_len < 24) { filter[filter_len++] = (char)ascii; filter[filter_len] = 0; dirty = 1; sel_tile = 0; }
     } else {
         fx_wm_key(key, ascii);                  /* la fenetre active traite la touche */
     }
