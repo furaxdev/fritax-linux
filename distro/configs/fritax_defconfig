@@ -29,7 +29,14 @@ BR2_LINUX_KERNEL_NEEDS_HOST_OPENSSL=y
 BR2_LINUX_KERNEL_NEEDS_HOST_LIBELF=y
 
 # --- compilateur compile par nous (APRES le noyau : voir l'avertissement) ---
-BR2_KERNEL_HEADERS_AS_KERNEL=y
+# ⚠️ NE PAS mettre BR2_KERNEL_HEADERS_AS_KERNEL avec un noyau en version
+# personnalisee : dans Buildroot, cette option ne selectionne les seuils
+# BR2_TOOLCHAIN_HEADERS_AT_LEAST_* que si le noyau est « latest » (voir
+# package/linux-headers/Config.in.host). Sinon glibc devient INDISPONIBLE
+# (BR2_PACKAGE_GLIBC_SUPPORTS exige AT_LEAST_3_2) et Buildroot retombe en
+# silence sur uClibc -> qui exige des en-tetes 2.6.x -> echec du build.
+# On declare donc explicitement la serie 6.12 (celle de notre noyau).
+BR2_KERNEL_HEADERS_6_12=y
 BR2_TOOLCHAIN_BUILDROOT_GLIBC=y
 BR2_TOOLCHAIN_BUILDROOT_CXX=y
 
