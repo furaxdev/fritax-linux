@@ -17,17 +17,17 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y build-essential git bison flex wget cpio unzip rsync bc python3 libncurses-dev file zip
 
-      # Garde tout ce qui a deja ete compile : la construction suivante ne refait
-      # que ce qui a change (de 1-2 h a quelques minutes).
+      # Cache : SEULEMENT si la cle correspond exactement (meme config, memes sources).
+      # AVANT on avait un « restore-keys » : il restaurait un dossier output/ perime
+      # (outil uClibc deja compile) meme apres un changement de config -> le build
+      # replantait toujours sur la meme erreur d'en-tetes. Plus jamais ca.
       - name: Cache de compilation
         uses: actions/cache@v4
         with:
           path: |
             distro/buildroot-2026.02.3/output
             distro/buildroot-2026.02.3.tar.gz
-          key: fritax-buildroot-${{ hashFiles('distro/configs/fritax_defconfig', 'distro/board/**', 'distro/package/**', 'desktop/**') }}
-          restore-keys: |
-            fritax-buildroot-
+          key: fritax-buildroot-v2-${{ hashFiles('distro/configs/fritax_defconfig', 'distro/board/**', 'distro/package/**', 'desktop/**') }}
 
       - name: Verifier la configuration retenue
         run: |
@@ -40,6 +40,24 @@ jobs:
           grep -E '^BR2_TOOLCHAIN_HEADERS_AT_LEAST_' .config | head -5 || true
           echo "--- paquets fritax ---"
           grep -cE '^BR2_PACKAGE_FRITAX_[A-Z]+=y' .config
+
+          # VERIFICATION BLOQUANTE : sans glibc, l'outil tombe sur uClibc qui exige
+          # des en-tetes noyau 2.6.x -> echec 14 minutes plus tard. On refuse tout de suite.
+          echo "--- controle bloquant ---"
+          if ! grep -q '^BR2_TOOLCHAIN_BUILDROOT_GLIBC=y' .config; then
+            echo "ECHEC: glibc non retenu dans .config"
+            grep -E '^BR2_TOOLCHAIN_BUILDROOT_(GLIBC|UCLIBC|MUSL)=' .config || true
+            exit 1
+          fi
+          if grep -q '^BR2_TOOLCHAIN_BUILDROOT_UCLIBC=y' .config; then
+            echo "ECHEC: uClibc encore actif dans .config"
+            exit 1
+          fi
+          if ! grep -q '^BR2_KERNEL_HEADERS_AS_KERNEL=y' .config; then
+            echo "ECHEC: en-tetes du noyau non alignes"
+            exit 1
+          fi
+          echo "OK: glibc + en-tetes du noyau 6.12 confirmes"
 
       - name: Compiler Fritax Linux (tout depuis les sources)
         env:

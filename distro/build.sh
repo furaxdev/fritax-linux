@@ -46,6 +46,40 @@ echo "== 3/4 : configuration de Fritax Linux =="
 cd "$BR_DIR"
 make BR2_EXTERNAL="$HERE" fritax_defconfig
 
+# --- 2e passe : ne pas dependre de l'ORDRE des lignes de la defconfig ---
+# Une option dont la dependance n'est pas encore activee est ignoree EN SILENCE
+# (ex. « en-tetes du noyau comme le noyau » vit dans « if BR2_LINUX_KERNEL »).
+# On reaffirme les options critiques sur la config deja resolue, puis on relance
+# la resolution : l'option tient des lors que sa dependance est satisfaite.
+cat >> .config <<'OPTIONS_CRITIQUES'
+BR2_KERNEL_HEADERS_AS_KERNEL=y
+BR2_TOOLCHAIN_BUILDROOT_GLIBC=y
+BR2_TOOLCHAIN_BUILDROOT_CXX=y
+BR2_PACKAGE_FRITAX_BRANDING=y
+BR2_PACKAGE_FRITAX_SHELL=y
+BR2_PACKAGE_FRITAX_TERMINAL=y
+BR2_PACKAGE_FRITAX_FILES=y
+BR2_PACKAGE_FRITAX_TUNNEL=y
+OPTIONS_CRITIQUES
+make olddefconfig >/dev/null
+
+# --- verification : echouer TOUT DE SUITE plutot qu'apres 40 minutes ---
+ERREUR=""
+grep -q '^BR2_KERNEL_HEADERS_AS_KERNEL=y' .config || ERREUR="$ERREUR en-tetes-noyau"
+grep -q '^BR2_TOOLCHAIN_BUILDROOT_GLIBC=y' .config || ERREUR="$ERREUR glibc"
+grep -q '^BR2_LINUX_KERNEL=y' .config              || ERREUR="$ERREUR noyau"
+for p in BRANDING SHELL TERMINAL FILES TUNNEL; do
+  grep -q "^BR2_PACKAGE_FRITAX_$p=y" .config || ERREUR="$ERREUR fritax-$p"
+done
+if [ -n "$ERREUR" ]; then
+  echo
+  echo "*** CONFIGURATION INCORRECTE, options absentes :$ERREUR"
+  echo "    (Buildroot les a ignorees : une dependance n'est pas satisfaite)"
+  echo "    bibliotheque C retenue : $(grep -E '^BR2_TOOLCHAIN_BUILDROOT_(GLIBC|UCLIBC|MUSL)=y' .config | head -1)"
+  exit 1
+fi
+echo "   configuration verifiee : glibc + noyau 6.12 + nos 5 paquets"
+
 echo "== 4/4 : compilation (long...) sur $JOBS taches"
 make -j"$JOBS"
 
