@@ -52,7 +52,9 @@ make BR2_EXTERNAL="$HERE" fritax_defconfig
 # On reaffirme les options critiques sur la config deja resolue, puis on relance
 # la resolution : l'option tient des lors que sa dependance est satisfaite.
 cat >> .config <<'OPTIONS_CRITIQUES'
-BR2_KERNEL_HEADERS_AS_KERNEL=y
+# ⚠️ 6_12 et PAS AS_KERNEL : AS_KERNEL n'active les seuils d'en-tetes que si le
+# noyau est « latest », sinon glibc devient indisponible -> uClibc -> echec.
+BR2_KERNEL_HEADERS_6_12=y
 BR2_TOOLCHAIN_BUILDROOT_GLIBC=y
 BR2_TOOLCHAIN_BUILDROOT_CXX=y
 BR2_PACKAGE_FRITAX_BRANDING=y
@@ -65,7 +67,8 @@ make olddefconfig >/dev/null
 
 # --- verification : echouer TOUT DE SUITE plutot qu'apres 40 minutes ---
 ERREUR=""
-grep -q '^BR2_KERNEL_HEADERS_AS_KERNEL=y' .config || ERREUR="$ERREUR en-tetes-noyau"
+grep -q '^BR2_KERNEL_HEADERS_6_12=y' .config || ERREUR="$ERREUR serie-en-tetes"
+grep -q '^BR2_TOOLCHAIN_BUILDROOT_UCLIBC=y' .config && ERREUR="$ERREUR uclibc-revenu"
 grep -q '^BR2_TOOLCHAIN_BUILDROOT_GLIBC=y' .config || ERREUR="$ERREUR glibc"
 grep -q '^BR2_LINUX_KERNEL=y' .config              || ERREUR="$ERREUR noyau"
 for p in BRANDING SHELL TERMINAL FILES TUNNEL; do
