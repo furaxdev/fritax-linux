@@ -53,11 +53,12 @@ jobs:
             echo "ECHEC: uClibc encore actif dans .config"
             exit 1
           fi
-          if ! grep -q '^BR2_KERNEL_HEADERS_AS_KERNEL=y' .config; then
-            echo "ECHEC: en-tetes du noyau non alignes"
+          if ! grep -q '^BR2_KERNEL_HEADERS_6_12=y' .config; then
+            echo "ECHEC: serie d'en-tetes 6.12 non retenue"
+            grep -E '^BR2_KERNEL_HEADERS' .config || true
             exit 1
           fi
-          echo "OK: glibc + en-tetes du noyau 6.12 confirmes"
+          echo "OK: glibc + serie d'en-tetes 6.12 confirmes"
 
       - name: Compiler Fritax Linux (tout depuis les sources)
         env:
