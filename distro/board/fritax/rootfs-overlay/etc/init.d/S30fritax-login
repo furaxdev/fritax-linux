@@ -1,0 +1,34 @@
+#!/bin/sh
+# ============================================================
+#  Fritax Linux : ecran de connexion puis bureau.
+#  Le trio login -> bureau -> retour au login forme un vrai
+#  gestionnaire de session : on se connecte, on travaille, on
+#  se deconnecte, et l'ecran de connexion revient.
+# ============================================================
+case "$1" in
+  start)
+    printf "Fritax Linux : ecran de connexion...\n"
+    if [ ! -e /dev/dri/card0 ]; then
+      printf "  (pas de carte graphique DRM : connexion ignoree)\n"
+      exit 0
+    fi
+    (
+      while true; do
+        /usr/bin/fritax-login >>/var/log/fritax-login.log 2>&1
+        [ -e /tmp/fritax-stop ] && break
+        printf "  (session terminee, retour a l'ecran de connexion)\n" >>/var/log/fritax-login.log
+        sleep 2
+      done
+    ) &
+    ;;
+  stop)
+    touch /tmp/fritax-stop
+    killall fritax-login 2>/dev/null || true
+    killall fritax-shell 2>/dev/null || true
+    rm -f /tmp/fritax-stop
+    ;;
+  restart|reload)
+    "$0" stop; sleep 1; "$0" start
+    ;;
+esac
+exit 0

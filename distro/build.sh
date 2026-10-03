@@ -59,6 +59,7 @@ BR2_TOOLCHAIN_BUILDROOT_GLIBC=y
 BR2_TOOLCHAIN_BUILDROOT_CXX=y
 BR2_PACKAGE_FRITAX_BRANDING=y
 BR2_PACKAGE_FRITAX_SHELL=y
+BR2_PACKAGE_FRITAX_LOGIN=y
 BR2_PACKAGE_FRITAX_TERMINAL=y
 BR2_PACKAGE_FRITAX_FILES=y
 BR2_PACKAGE_FRITAX_TUNNEL=y
@@ -71,7 +72,7 @@ grep -q '^BR2_KERNEL_HEADERS_6_12=y' .config || ERREUR="$ERREUR serie-en-tetes"
 grep -q '^BR2_TOOLCHAIN_BUILDROOT_UCLIBC=y' .config && ERREUR="$ERREUR uclibc-revenu"
 grep -q '^BR2_TOOLCHAIN_BUILDROOT_GLIBC=y' .config || ERREUR="$ERREUR glibc"
 grep -q '^BR2_LINUX_KERNEL=y' .config              || ERREUR="$ERREUR noyau"
-for p in BRANDING SHELL TERMINAL FILES TUNNEL; do
+for p in BRANDING SHELL LOGIN TERMINAL FILES TUNNEL; do
   grep -q "^BR2_PACKAGE_FRITAX_$p=y" .config || ERREUR="$ERREUR fritax-$p"
 done
 if [ -n "$ERREUR" ]; then
@@ -81,9 +82,15 @@ if [ -n "$ERREUR" ]; then
   echo "    bibliotheque C retenue : $(grep -E '^BR2_TOOLCHAIN_BUILDROOT_(GLIBC|UCLIBC|MUSL)=y' .config | head -1)"
   exit 1
 fi
-echo "   configuration verifiee : glibc + noyau 6.12 + nos 5 paquets"
+echo "   configuration verifiee : glibc + noyau 6.12 + nos 6 paquets"
 
 echo "== 4/4 : compilation (long...) sur $JOBS taches"
+# Nos propres paquets (desktop/) sont minuscules : on efface leurs tampons de
+# compilation a chaque run pour qu une modification du C soit TOUJOURS reprise.
+# Sans ca, Buildroot garde l ancienne version compilee et on livre un binaire
+# qui ne correspond plus aux sources. (Le compilateur, lui, reste en cache.)
+rm -rf output/build/fritax-* 2>/dev/null || true
+
 make -j"$JOBS"
 
 ISO=$(ls -1 "${BR_DIR}"/output/images/*.iso 2>/dev/null | head -1)

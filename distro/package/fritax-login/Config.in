@@ -1,0 +1,7 @@
+config BR2_PACKAGE_FRITAX_LOGIN
+	bool "fritax-login"
+	help
+	  Ecran de connexion de Fritax Linux : carte centree aux coins
+	  lisses, deux champs, bouton "Se connecter". Apres une
+	  connexion reussie il lance le bureau (fritax-shell).
+	  Parle directement au materiel (DRM/KMS) : ni X11, ni Wayland.

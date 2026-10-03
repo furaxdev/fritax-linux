@@ -138,4 +138,39 @@ dis-moi ce qui te manque en premier.
 
 ---
 
-*Fait avec beaucoup d'attention, pour Fritax. ❤️*
+*Fait avec beaucoup d'attention, pour Fritax.* ❤️
+
+---
+
+## Ecran de connexion (nouveau)
+
+Fritax Linux demarre maintenant sur un **ecran de connexion** maison
+(`fritax-login`, DRM/KMS, aucun serveur graphique), avant d'ouvrir le bureau.
+Le trio « connexion -> bureau -> retour a la connexion » forme un vrai
+gestionnaire de session.
+
+**Compte de la distribution** : utilisateur `furax` (ou `root`), mot de passe `fritax`.
+Le pseudo est pre-rempli : on tape juste le mot de passe puis Entree.
+
+- `Entree` = valider (ou passer au champ suivant)
+- `Tab` = changer de champ, `Echap` = effacer le pseudo
+- `Retour arriere` = effacer une lettre
+
+## Verifier AVANT d'envoyer (ne plus perdre 1 h de compilation)
+
+```sh
+distro/valider-tout.sh        # controle complet : code, config, paquets, scripts
+```
+
+Ce script compile **tout** le C en local, fait tourner les **3 suites de tests**,
+valide chaque option de la config Buildroot contre l'arbre reel, et verifie
+qu'aucun des pieges deja payes n'est revenu. S'il est vert, la compilation
+cloud ne peut plus echouer sur une erreur bete.
+
+## Iterer vite : le cache
+
+La cle du cache GitHub porte **uniquement sur la configuration du compilateur**
+(defconfig + board). Modifier le C des applis ne l'invalide plus : seuls nos
+petits paquets sont recompiles, le compilateur reste en cache.
+`build.sh` efface de lui-meme les tampons de nos paquets a chaque run, pour
+qu'une modification du C soit toujours reprise.

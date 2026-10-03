@@ -27,7 +27,11 @@ jobs:
           path: |
             distro/buildroot-2026.02.3/output
             distro/buildroot-2026.02.3.tar.gz
-          key: fritax-buildroot-v2-${{ hashFiles('distro/configs/fritax_defconfig', 'distro/board/**', 'distro/package/**', 'desktop/**') }}
+          # Cle = UNIQUEMENT ce qui change le compilateur lui-meme (defconfig + board).
+          # Les sources de nos applis (desktop/) n'y sont PLUS : Buildroot les
+          # recompile de toute facon (build.sh efface leurs tampons a chaque run).
+          # Avant, toucher une ligne de C invalidait 35 min de compilateur.
+          key: fritax-buildroot-v2-${{ hashFiles('distro/configs/fritax_defconfig', 'distro/board/**') }}
 
       - name: Verifier la configuration retenue
         run: |

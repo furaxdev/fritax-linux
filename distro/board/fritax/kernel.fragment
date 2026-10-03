@@ -1,36 +1,101 @@
-# Fritax Linux - configuration du noyau (extrait)
-# Affichage direct (DRM/KMS) : pas de serveur graphique du tout
+# ============================================================
+#  FRITAX LINUX - reglages du noyau (fragment)
+#  Le noyau de base vient du defconfig x86_64 de Linux ; ici on
+#  ajoute ce qui est INDISPENSABLE au bureau Fritax : affichage
+#  direct (DRM/KMS), clavier/souris (evdev), et les pilotes
+#  graphiques COMPILES DANS LE NOYAU (pas en modules : le demarrage
+#  se fait sur un disque RAM, aucun module n'est charge).
+#  Cible : AMD A6-3400M (Radeon HD 6520G) du PC de fritaxdev.
+# ============================================================
+
+# --- systemes de fichiers et initrd ---
+CONFIG_DEVTMPFS=y
+CONFIG_DEVTMPFS_MOUNT=y
+CONFIG_BLK_DEV_INITRD=y
+CONFIG_RD_GZIP=y
+CONFIG_TMPFS=y
+CONFIG_PROC_FS=y
+CONFIG_SYSFS=y
+CONFIG_ISO9660_FS=y
+CONFIG_VFAT_FS=y
+CONFIG_FAT_FS=y
+CONFIG_EXT4_FS=y
+CONFIG_NLS_CODEPAGE_437=y
+CONFIG_NLS_ISO8859_1=y
+
+# --- materiel d'affichage : DRM/KMS integre ---
 CONFIG_DRM=y
 CONFIG_DRM_KMS_HELPER=y
 CONFIG_DRM_FBDEV_EMULATION=y
+CONFIG_FB=y
 CONFIG_FRAMEBUFFER_CONSOLE=y
-# Vieux GPU AMD (le Acer de Fritax) + cartes de test dans une machine virtuelle
+CONFIG_DRM_SIMPLEDRM=y
+CONFIG_DRM_VKMS=y
+
+# --- pilotes graphiques des PC de la famille (integrés) ---
 CONFIG_DRM_RADEON=y
-CONFIG_DRM_AMDGPU=m
+CONFIG_DRM_AMDGPU=y
+CONFIG_DRM_I915=y
+CONFIG_DRM_NOUVEAU=y
+CONFIG_DRM_QXL=y
 CONFIG_DRM_BOCHS=y
 CONFIG_DRM_VIRTIO_GPU=y
-CONFIG_DRM_SIMPLEDRM=y
-# Souris et clavier directs (evdev)
+CONFIG_DRM_VMWGFX=y
+
+# --- entrees : clavier, souris, pavé tactile ---
 CONFIG_INPUT_EVDEV=y
-CONFIG_INPUT_MOUSE=y
 CONFIG_INPUT_KEYBOARD=y
-CONFIG_INPUT_MOUSEDEV=y
+CONFIG_INPUT_MOUSE=y
+CONFIG_MOUSE_PS2=y
+CONFIG_MOUSE_PS2_ELANTECH=y
+CONFIG_HID=y
 CONFIG_HID_GENERIC=y
 CONFIG_USB_HID=y
 CONFIG_USB_SUPPORT=y
+CONFIG_USB=y
 CONFIG_USB_XHCI_HCD=y
 CONFIG_USB_EHCI_HCD=y
-# Systemes de fichiers (ISO live + disque + squashfs compresse)
-CONFIG_ISO9660_FS=y
-CONFIG_SQUASHFS=y
-CONFIG_SQUASHFS_XZ=y
-CONFIG_EXT4_FS=y
-CONFIG_OVERLAY_FS=y
-CONFIG_TMPFS=y
-# Reseau (utile pour installer des choses plus tard)
+CONFIG_USB_OHCI_HCD=y
+
+# --- disques et bus ---
+CONFIG_ATA=y
+CONFIG_SATA_AHCI=y
+CONFIG_ATA_PIIX=y
+CONFIG_BLK_DEV_SD=y
+CONFIG_SCSI=y
+CONFIG_PCI=y
+CONFIG_MMC=y
+
+# --- reseau (le tunnel maison en a besoin) ---
+CONFIG_NET=y
 CONFIG_PACKET=y
 CONFIG_UNIX=y
 CONFIG_INET=y
+CONFIG_ETHERNET=y
+CONFIG_NETDEVICES=y
 CONFIG_E1000=y
 CONFIG_E1000E=y
 CONFIG_R8169=y
+CONFIG_8139TOO=y
+CONFIG_8139CP=y
+CONFIG_VIRTIO_NET=y
+CONFIG_IPV6=y
+CONFIG_TUN=y
+
+# --- divers utiles ---
+CONFIG_RTC_CLASS=y
+CONFIG_RTC_DRV_CMOS=y
+CONFIG_SND=y
+CONFIG_SND_HDA_INTEL=y
+CONFIG_SND_USB_AUDIO=y
+CONFIG_PRINTK=y
+CONFIG_MAGIC_SYSRQ=y
+CONFIG_ACPI=y
+CONFIG_ACPI_VIDEO=y
+CONFIG_CPU_FREQ=y
+CONFIG_X86_MSR=y
+CONFIG_X86_CPUID=y
+
+# --- alléger : pas de debug inutile dans une ISO de bureau ---
+# CONFIG_DEBUG_INFO is not set
+# CONFIG_DEBUG_KERNEL is not set
