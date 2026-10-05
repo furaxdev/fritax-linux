@@ -51,7 +51,10 @@ BR2_TARGET_GENERIC_GETTY_PORT="tty1"
 BR2_SYSTEM_DHCP="eth0"
 
 # --- fichiers propres a la distribution ---
-BR2_ROOTFS_OVERLAY="board/fritax/rootfs-overlay"
+# ⚠️ meme regle que pour le fragment : Buildroot resout depuis SA racine,
+# donc ".." remonte dans distro/. Sans le "..", l'overlay est introuvable
+# et tous les fonds d'ecran / icones / menus n'arrivent JAMAIS dans l'ISO.
+BR2_ROOTFS_OVERLAY="../board/fritax/rootfs-overlay"
 
 # --- userland que NOUS choisissons ---
 BR2_PACKAGE_BASH=y
@@ -80,6 +83,6 @@ BR2_TARGET_SYSLINUX=y
 BR2_TARGET_SYSLINUX_ISOLINUX=y
 BR2_TARGET_ROOTFS_ISO9660=y
 BR2_TARGET_ROOTFS_ISO9660_ISOLINUX=y
-BR2_TARGET_ROOTFS_ISO9660_BOOT_MENU="board/fritax/isolinux.cfg"
+BR2_TARGET_ROOTFS_ISO9660_BOOT_MENU="../board/fritax/isolinux.cfg"
 BR2_TARGET_ROOTFS_ISO9660_INITRD=y
 BR2_TARGET_ROOTFS_ISO9660_HYBRID=y

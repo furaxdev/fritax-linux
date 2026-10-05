@@ -46,13 +46,37 @@ for p in BRANDING SHELL FILES TERMINAL TUNNEL LOGIN; do
     grep -q "$p" distro/build.sh || ko "BR2_PACKAGE_FRITAX_$p non reverifie par build.sh"
 done
 
-# ---------- 4. fichiers demandes par la config presents ----------
+# ---------- 4. fichiers demandes par la config ----------
+# Le point cle : Buildroot resout ces chemins DEPUIS SA PROPRE RACINE
+# (distro/buildroot-*/), pas depuis distro/. Un chemin sans "../" est
+# donc introuvable -> le build s'arrete (ou pire, l'overlay est ignore
+# en silence et l'ISO sort sans nos fonds d'ecran). On teste pour de vrai.
 printf '\n[4/6] Fichiers cites par la configuration\n'
+# En CI, l arbre Buildroot est TOUJOURS a distro/buildroot-<version>/.
+# On simule donc ce chemin exactement : le shell resout ".." tout seul,
+# donc "distro/buildroot-2026.02.3/../board/..." tombe dans distro/board/.
+# C est le meme raisonnement que celui de Buildroot -> verdict fiable.
+# En CI l arbre vit dans distro/buildroot-<version>/, donc un chemin "../x"
+# depuis cet arbre = distro/x. On reproduit ce raisonnement a l identique :
+# tout chemin doit commencer par "../" et pointer sur un fichier de distro/.
+verifie_chemin() {   # <chemin> <type: f|d> <libelle>
+    local chemin="$1" type="$2" libelle="$3"
+    case "$chemin" in
+        ../*) ;;
+        *) ko "$libelle : \"$chemin\" ne commence pas par ../ -> Buildroot cherchera dans son propre dossier et ne trouvera rien"; return ;;
+    esac
+    local reel="distro/${chemin#../}"
+    if [ "$type" = d ]; then
+        [ -d "$reel" ] && ok "$libelle : $reel" || ko "$libelle : $reel INTROUVABLE"
+    else
+        [ -f "$reel" ] && ok "$libelle : $reel" || ko "$libelle : $reel INTROUVABLE"
+    fi
+}
 for f in $(grep -oE '"[^"]*\.(fragment|cfg)"' distro/configs/fritax_defconfig | tr -d '"'); do
-    chemin="distro/$f"
-    [ -f "$chemin" ] || chemin="distro/board/fritax/$(basename "$f")"
-    if [ -f "$chemin" ]; then ok "$f present"; else ko "$f INTROUVABLE (la compilation s'arretera)"; fi
+    verifie_chemin "$f" f "fichier de config"
 done
+OVL=$(grep -oE 'BR2_ROOTFS_OVERLAY="[^"]*"' distro/configs/fritax_defconfig | cut -d'"' -f2)
+verifie_chemin "$OVL" d "overlay (fonds d ecran, menus)"
 for f in board/fritax/isolinux.cfg board/fritax/rootfs-overlay/etc/init.d/S99fritax-shell; do
     [ -f "distro/$f" ] && ok "$(basename $f) present" || ko "$f absent"
 done
