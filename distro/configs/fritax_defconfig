@@ -86,3 +86,7 @@ BR2_TARGET_ROOTFS_ISO9660_ISOLINUX=y
 BR2_TARGET_ROOTFS_ISO9660_BOOT_MENU="../board/fritax/isolinux.cfg"
 BR2_TARGET_ROOTFS_ISO9660_INITRD=y
 BR2_TARGET_ROOTFS_ISO9660_HYBRID=y
+# L'image tar est activee par defaut par Buildroot et n'est pas necessaire : sa
+# generation echouait apres l'ISO et faisait echouer tout le job (donc l'ISO etait
+# jetee). On la desactive explicitement.
+# BR2_TARGET_ROOTFS_TAR is not set

@@ -93,7 +93,10 @@ rm -rf output/build/fritax-* 2>/dev/null || true
 
 make -j"$JOBS"
 
-ISO=$(ls -1 "${BR_DIR}"/output/images/*.iso 2>/dev/null | head -1)
+# Buildroot nomme l'image ISO "rootfs.iso9660" (PAS de .iso a la fin) : l'ancien
+# glob *.iso ne trouvait donc jamais rien et le script criait "Pas d'ISO produite"
+# alors que l'ISO venait d'etre fabriquee avec succes.
+ISO=$(ls -1 "${BR_DIR}"/output/images/*.iso "${BR_DIR}"/output/images/*.iso9660 2>/dev/null | head -1)
 if [ -n "$ISO" ]; then
   cp -f "$ISO" "${HERE}/fritax-linux-1.0-nova.iso"
   echo
