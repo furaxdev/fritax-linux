@@ -1,0 +1,69 @@
+name: Tester le demarrage de l'ISO
+
+# Demarre l'ISO dans QEMU sans ecran, prend des captures d'ecran a plusieurs
+# moments (demarrage, ecran de connexion, bureau), tape le compte et le mot de
+# passe, et publie les images en artefact. Ca permet de verifier le demarrage
+# reel sans avoir la machine sous la main.
+
+on:
+  workflow_dispatch:
+    inputs:
+      iso_url:
+        description: "Adresse de l'ISO a tester (vide = derniere release)"
+        required: false
+        default: ""
+  push:
+    paths:
+      - "distro/tester-demarrage.py"
+      - ".github/workflows/test-demarrage.yml"
+
+jobs:
+  demarrage:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Installer QEMU et Pillow
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq qemu-system-x86 python3-pil
+
+      - name: Recuperer l'ISO
+        run: |
+          set -e
+          if [ -n "${{ github.event.inputs.iso_url }}" ]; then
+            URL="${{ github.event.inputs.iso_url }}"
+          else
+            URL=$(curl -s https://api.github.com/repos/${{ github.repository }}/releases/latest \
+                  | python3 -c "import json,sys;d=json.load(sys.stdin);print([a['browser_download_url'] for a in d.get('assets',[]) if a['name'].endswith('.iso')][0])")
+          fi
+          echo "ISO : $URL"
+          curl -L -o fritax.iso "$URL"
+          ls -l fritax.iso
+
+      - name: Demarrer l'ISO dans QEMU et capturer
+        run: |
+          python3 distro/tester-demarrage.py fritax.iso /tmp/captures || true
+
+      - name: Convertir les captures en PNG
+        run: |
+          python3 - <<'PY'
+          import glob, os
+          from PIL import Image
+          for p in sorted(glob.glob("/tmp/captures/*.ppm")):
+              im = Image.open(p)
+              sortie = p[:-4] + ".png"
+              im.save(sortie)
+              print("  ", os.path.basename(sortie), im.size)
+          PY
+          ls -l /tmp/captures/ || true
+
+      - name: Publier les captures
+        uses: actions/upload-artifact@v4
+        with:
+          name: captures-demarrage
+          path: |
+            /tmp/captures/*.png
+            /tmp/qemu-console.log
+          if-no-files-found: warn
