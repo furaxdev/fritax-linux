@@ -76,17 +76,32 @@ def capture(nom):
 
 
 def taper(texte, pause=0.06):
-    """Envoie du texte touche par touche, en traduisant les caracteres qui ne
-    sont pas de simples lettres (QEMU utilise des noms de touches)."""
-    nom = {" ": "spc", "/": "slash", ".": "dot", "-": "minus",
-           "=": "equal", "_": "shift-minus", "|": "shift-backslash"}
+    """Envoie du texte touche par touche.
+
+    Attention : la console de Fritax est en AZERTY (le script S10clavier charge
+    la disposition francaise). Or QEMU envoie des *positions* de touches d'un
+    clavier americain. Il faut donc traduire chaque caractere voulu vers la
+    touche qui le produit reellement sur un clavier francais — sinon "cat"
+    devient "cqt" et le mot de passe "fritax" devient "fritqx".
+    """
+    # lettres deplacees par l'AZERTY
+    deplace = {"a": "q", "q": "a", "z": "w", "w": "z", "m": "semicolon"}
+    # caracteres obtenus par une autre touche (avec ou sans majuscule)
+    autres = {
+        " ": ("spc", False), "/": ("dot", True), ".": ("comma", True),
+        "-": ("6", False), "=": ("equal", False), "_": ("8", False),
+        "'": ("4", False), ":": ("dot", False),
+    }
     for c in texte:
-        touche = nom.get(c, c)
-        if touche.startswith("shift-"):
-            commande("send-key", keys=[{"type": "qcode", "data": "shift"},
-                                       {"type": "qcode", "data": touche[6:]}])
+        if c in deplace:
+            commande("send-key", keys=[{"type": "qcode", "data": deplace[c]}])
+        elif c in autres:
+            touche, maj = autres[c]
+            suite = ([{"type": "qcode", "data": "shift"}] if maj else []) + \
+                    [{"type": "qcode", "data": touche}]
+            commande("send-key", keys=suite)
         else:
-            commande("send-key", keys=[{"type": "qcode", "data": touche}])
+            commande("send-key", keys=[{"type": "qcode", "data": c}])
         time.sleep(pause)
 
 
