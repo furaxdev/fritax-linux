@@ -11,24 +11,27 @@ TERM    := ../fritax-terminal/src
 LIBS_X11 := -lX11
 SHARED  := $(TERM)/screen.c $(TERM)/vt.c $(TERM)/appicon.c $(TERM)/window.c
 PLATFORM := $(TERM)/drm.c $(TERM)/input.c
+# crypt() sert a comparer le mot de passe au hachage de /etc/shadow :
+# la verification se fait sur les vrais comptes de la machine.
+LIBS    ?= -lcrypt
 
 all: native
 
 native: fritax-login-native
 fritax-login-native: src/main_native.c src/login.c $(SHARED) $(PLATFORM)
-	$(CC) $(CFLAGS) -Isrc -I$(TERM) -o $@ src/main_native.c src/login.c $(SHARED) $(PLATFORM)
+	$(CC) $(CFLAGS) -Isrc -I$(TERM) -o $@ src/main_native.c src/login.c $(SHARED) $(PLATFORM) $(LIBS)
 
 x11: fritax-login
 fritax-login: src/main_x11.c src/login.c $(SHARED)
-	$(CC) $(CFLAGS) -Isrc -I$(TERM) -o $@ src/main_x11.c src/login.c $(SHARED) $(LIBS_X11)
+	$(CC) $(CFLAGS) -Isrc -I$(TERM) -o $@ src/main_x11.c src/login.c $(SHARED) $(LIBS_X11) $(LIBS)
 
 apercu: fritax-login-apercu
 fritax-login-apercu: src/main_x11.c src/login.c $(SHARED)
-	$(CC) $(CFLAGS) -DFX_NO_X11 -Isrc -I$(TERM) -o $@ src/main_x11.c src/login.c $(SHARED)
+	$(CC) $(CFLAGS) -DFX_NO_X11 -Isrc -I$(TERM) -o $@ src/main_x11.c src/login.c $(SHARED) $(LIBS)
 
 test: fritax-login-test
 fritax-login-test: tests/test_login.c src/login.c $(SHARED)
-	$(CC) $(CFLAGS) -Isrc -I$(TERM) -o $@ tests/test_login.c src/login.c $(SHARED)
+	$(CC) $(CFLAGS) -Isrc -I$(TERM) -o $@ tests/test_login.c src/login.c $(SHARED) $(LIBS)
 	./fritax-login-test
 
 clean:

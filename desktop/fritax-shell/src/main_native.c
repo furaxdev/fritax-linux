@@ -53,6 +53,15 @@ static void on_key(void *u, int key, int ascii) {
 }
 static void on_scroll(void *u, int up) { (void)u; fx_ui_wheel(cursor_x, cursor_y, up); }
 
+/* La console texte (fbcon) continue de redessiner par-dessus notre image tant
+   qu'elle est en mode texte. Sans la basculer en mode graphique, le bureau
+   tourne bien mais rien n'apparait : on ne voit que le texte, et le programme
+   reste bloque la sans rendre la main. D'ou ces en-tetes. */
+#include <fcntl.h>
+#include <unistd.h>
+#include <sys/ioctl.h>
+#include <linux/kd.h>
+
 int main(int argc, char **argv) {
     const char *card = "/dev/dri/card0";
     for (int i = 1; i < argc; i++) if (!strcmp(argv[i], "--card") && i + 1 < argc) card = argv[++i];
@@ -65,8 +74,23 @@ int main(int argc, char **argv) {
     drm = fx_drm_open(card);
     if (!drm) { fprintf(stderr, "fritax-shell: pas d'affichage DRM (%s)\n", card); return 1; }
     W = fx_drm_width(drm); H = fx_drm_height(drm);
+    fprintf(stderr, "fritax-shell: affichage ouvert sur %s, %dx%d\n", card, W, H);
     bufs[0] = fx_drm_buf_new(drm); bufs[1] = fx_drm_buf_new(drm);
     if (!bufs[0] || !bufs[1]) { fprintf(stderr, "fritax-shell: tampons indisponibles\n"); return 1; }
+    fprintf(stderr, "fritax-shell: deux tampons prets\n");
+
+    /* On passe la console en mode graphique : le noyau arrete de redessiner le
+       texte, et notre image reste a l'ecran. On la remet en mode texte en
+       sortant, sinon le shell de secours devient invisible. */
+    int tty0 = open("/dev/tty0", O_RDWR);
+    if (tty0 >= 0) {
+        if (ioctl(tty0, KDSETMODE, KD_GRAPHICS) == 0)
+            fprintf(stderr, "fritax-shell: console passee en mode graphique\n");
+        else
+            fprintf(stderr, "fritax-shell: console non basculable (l'image peut clignoter)\n");
+    } else {
+        fprintf(stderr, "fritax-shell: /dev/tty0 inaccessible (l'image peut clignoter)\n");
+    }
 
     fb = fx_screen_new(W, H); clean = fx_screen_new(W, H);
     fx_ui_init(W, H, lp, 1);
@@ -95,6 +119,7 @@ int main(int argc, char **argv) {
 
     FXInputs *inputs = fx_inputs_open();
     cursor_x = W / 2; cursor_y = H - 80;
+    int premiere_image = 1;
 
     int running = 1;
     while (running) {
@@ -121,6 +146,10 @@ int main(int argc, char **argv) {
         for (int y = 0; y < H; y++)
             memcpy((char *)b->map + (size_t)y * b->pitch, fb->px + (size_t)y * W, (size_t)W * 4);
         fx_drm_buf_flip(drm, b);
+        if (premiere_image) {
+            fprintf(stderr, "fritax-shell: premiere image affichee\n");
+            premiere_image = 0;
+        }
         cur ^= 1;
         if (fx_ui_wants_close()) break;
 
@@ -130,5 +159,10 @@ int main(int argc, char **argv) {
             for (int i = 0; i < n; i++) if (pfds[i].revents & POLLIN) fx_inputs_handle(inputs, i, on_move, on_button, on_key, on_scroll, NULL);
     }
     fx_inputs_close(inputs);
+    if (tty0 >= 0) {
+        ioctl(tty0, KDSETMODE, KD_TEXT);
+        close(tty0);
+    }
+    fprintf(stderr, "fritax-shell: arret, console rendue au mode texte\n");
     return 0;
 }

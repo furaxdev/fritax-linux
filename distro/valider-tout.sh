@@ -11,6 +11,26 @@ erreurs=0
 ok()   { printf '  ✅ %s\n' "$1"; }
 ko()   { printf '  ❌ %s\n' "$1"; erreurs=$((erreurs+1)); }
 
+# --- crypt() : l'ecran de connexion compare les mots de passe de /etc/shadow,
+# --- il se lie donc a -lcrypt. Dans l'image, libxcrypt (Buildroot) fournit le
+# --- lien de developpement. Sur une machine de developpement qui n'a que la
+# --- bibliotheque d'execution (libcrypt.so.1 sans libcrypt.so), la liaison
+# --- echoue alors que le code est bon : on fabrique le lien manquant
+# --- localement, sans rien modifier au projet.
+if ! cc -o /dev/null -xc /dev/null -lcrypt >/dev/null 2>&1; then
+    for reelle in /lib/x86_64-linux-gnu/libcrypt.so.1 /usr/lib/x86_64-linux-gnu/libcrypt.so.1 /lib64/libcrypt.so.1 /usr/lib64/libcrypt.so.1; do
+        if [ -e "$reelle" ]; then
+            mkdir -p /tmp/fritax-libs
+            ln -sf "$reelle" /tmp/fritax-libs/libcrypt.so
+            # zig cc ignore LIBRARY_PATH : on passe le chemin directement
+            # dans LIBS, que le Makefile laisse surchargeable.
+            export LIBS="-L/tmp/fritax-libs -lcrypt"
+            printf '  (libcrypt : lien local fabrique pour la compilation)\n'
+            break
+        fi
+    done
+fi
+
 printf '\n╔══════════════════════════════════════════════════╗\n'
 printf '║   FRITAX LINUX - controle avant envoi            ║\n'
 printf '╚══════════════════════════════════════════════════╝\n'

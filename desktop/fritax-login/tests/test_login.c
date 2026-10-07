@@ -44,10 +44,16 @@ int main(void) {
     verifie(l.motdepasse[0] == 0, "le champ est vide apres un refus");
     verifie(l.tentatives == 1, "une tentative est comptee");
 
-    /* --- le bon mot de passe passe --- */
-    tape(&l, "fritax");
+    /* --- l'authentification interroge maintenant les VRAIS comptes de la
+       machine : on ne peut donc plus affirmer qu'un couple precis est accepte,
+       ca depend de la machine qui fait tourner le test. Ce qui doit toujours
+       etre vrai, c'est le comportement : chaque essai compte, un refus laisse
+       le champ vide, et on ne passe pas. --- */
+    tape(&l, "encorefaux");
     fx_login_touche(&l, FXK_ENTER, 0);
-    verifie(l.etat == FXL_CONNECTE, "le bon mot de passe est accepte");
+    verifie(l.etat != FXL_CONNECTE, "un second essai faux ne connecte pas");
+    verifie(l.tentatives == 2, "le second essai est compte");
+    verifie(l.motdepasse[0] == 0, "le champ est encore vide apres le second refus");
 
     /* --- le retour arriere efface un caractere --- */
     fx_login_init(&l, 1366, 768);
@@ -57,18 +63,26 @@ int main(void) {
     verifie(!strcmp(l.motdepasse, "frita"), "le retour arriere efface une lettre");
 
     /* --- la verification directe --- */
-    verifie(fx_login_verifie("furax", "fritax") == 1, "furax / fritax accepte");
-    verifie(fx_login_verifie("root", "fritax") == 1, "root / fritax accepte");
-    verifie(fx_login_verifie("furax", "faux") == 0, "mauvais mot de passe refuse");
-    verifie(fx_login_verifie("intrus", "fritax") == 0, "mauvais pseudo refuse");
-    verifie(fx_login_verifie("", "") == 0, "vide refuse");
+    /* L'authentification interroge maintenant les VRAIS comptes de la machine
+       (/etc/passwd + /etc/shadow + crypt). On ne peut donc plus affirmer qu'un
+       couple precis est accepte : ca depend de la machine. Ce qui est vrai
+       partout, c'est ce qu'on verifie ici. */
+    verifie(fx_login_verifie("utilisateur-qui-nexiste-pas-xyz", "nimportequoi") == 0,
+            "un compte inexistant est refuse");
+    verifie(fx_login_verifie("", "fritax") == 0, "pseudo vide refuse");
+    verifie(fx_login_verifie("root", "") == 0, "mot de passe vide refuse");
+    verifie(fx_login_verifie(NULL, "fritax") == 0, "pseudo NULL refuse");
+    verifie(fx_login_verifie("root", NULL) == 0, "mot de passe NULL refuse");
+    /* mauvaise suite pour un compte qui existe : doit etre refuse */
+    verifie(fx_login_verifie("root", "ce-nest-pas-le-bon-mot-de-passe") == 0,
+            "mauvais mot de passe refuse pour un compte existant");
 
     /* --- la souris : clic sur le bouton = validation --- */
     fx_login_init(&l, 1366, 768);
     fx_login_touche(&l, FXK_TAB, 0);
     tape(&l, "fritax");
     fx_login_touche(&l, FXK_ENTER, 0);
-    verifie(l.etat == FXL_CONNECTE, "Entree valide apres le mot de passe");
+    verifie(l.tentatives == 1, "Entree declenche bien une verification");
 
     /* --- l'ecran sait se dessiner dans n'importe quelle taille --- */
     FXScreen *s = fx_screen_new(800, 600);

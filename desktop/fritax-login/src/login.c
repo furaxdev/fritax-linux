@@ -10,6 +10,14 @@
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
+#include <pwd.h>        /* getpwnam : le vrai /etc/passwd */
+#include <shadow.h>     /* getspnam : le vrai /etc/shadow */
+/* crypt() vient de libxcrypt (paquet libxcrypt de Buildroot). L'en-tete
+   <crypt.h> n'est pas fourni partout, et la signature est stable depuis
+   toujours : on la declare ici, comme ca le fichier compile aussi bien dans
+   l'image que sur une machine de developpement qui n'a que la bibliotheque
+   d'execution. */
+extern char *crypt(const char *cle, const char *hachage);
 
 /* --- couleurs de la charte --- */
 #define C_FOND_HAUT   fx_rgb(0x1b, 0x10, 0x30)
@@ -69,12 +77,35 @@ void fx_login_init(FXLogin *l, int w, int h) {
  *   dans LIVRAISON.md ; le mot de passe est celui du root, defini
  *   par BR2_TARGET_GENERIC_ROOT_PASSWD.)
  * --------------------------------------------------------------- */
+/* On interroge les VRAIS comptes de la machine : /etc/passwd pour savoir si
+   l'utilisateur existe, /etc/shadow pour recuperer son mot de passe hache, et
+   crypt() pour comparer. Aucun nom ni mot de passe n'est ecrit en dur ici :
+   la distribution n'est pas faite pour une seule machine, n'importe quel
+   compte cree ensuite (par l'utilisateur ou par un futur installateur)
+   fonctionne. L'ecran de connexion tourne en root, donc il a le droit de
+   lire /etc/shadow. */
 int fx_login_verifie(const char *utilisateur, const char *motdepasse) {
-    if (!utilisateur || !motdepasse) return 0;
-    int bon_nom = (!strcmp(utilisateur, "furax") || !strcmp(utilisateur, "root")
-                   || !strcmp(utilisateur, "fritaxdev") || !strcmp(utilisateur, "fritax"));
-    int bon_mdp = !strcmp(motdepasse, "fritax");
-    return bon_nom && bon_mdp;
+    if (!utilisateur || !*utilisateur || !motdepasse) return 0;
+
+    struct passwd *pw = getpwnam(utilisateur);
+    if (!pw) return 0;                       /* ce compte n'existe pas */
+
+    struct spwd *sp = getspnam(utilisateur);
+    const char *hachage = sp ? sp->sp_pwdp : pw->pw_passwd;
+
+    /* compte sans mot de passe, ou verrouille : on refuse */
+    if (!hachage || !*hachage) return 0;
+    if (hachage[0] == '!' || hachage[0] == '*') return 0;
+
+    char *calcule = crypt(motdepasse, hachage);
+    if (!calcule) return 0;
+    /* comparaison a temps constant : on ne laisse pas fuir la longueur du
+       mot de passe par le temps de reponse */
+    size_t n = strlen(hachage);
+    if (strlen(calcule) != n) return 0;
+    unsigned char diff = 0;
+    for (size_t i = 0; i < n; i++) diff |= (unsigned char)(calcule[i] ^ hachage[i]);
+    return diff == 0;
 }
 
 const char *fx_login_session(void) { return "fritax-shell"; }
@@ -266,7 +297,7 @@ void fx_login_dessine(FXLogin *l, FXScreen *s) {
     int larg = (int)strlen(hor) * FX_CELL_W;
     fx_draw_text(s, s->w - larg - 24, 20, hor, C_GRIS);
     fx_draw_text(s, 24, 20, "fritax-linux", C_GRIS);
-    fx_draw_text(s, 24, s->h - FX_CELL_H - 20, "Fritax Linux 1.0 (Nova)", C_GRIS);
+    fx_draw_text(s, 24, s->h - FX_CELL_H - 20, "Fritax Linux 1.2 (Nova)", C_GRIS);
     const char *aide = "Ecrit ton mot de passe puis Entree";
     fx_draw_text(s, s->w - (int)strlen(aide) * FX_CELL_W - 24, s->h - FX_CELL_H - 20, aide, C_GRIS);
 }

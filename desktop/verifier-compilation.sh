@@ -63,10 +63,21 @@ bloc "fichiers (native)" fritax-files-native $D/fritax-files/src/main_native.c \
 INCS=""
 bloc "tunnel" fritax-tunnel $D/fritax-tunnel/src/fritax-tunnel.c
 
+# --- crypt() : l'ecran de connexion compare les mots de passe de /etc/shadow.
+# --- Dans l'image, libxcrypt (Buildroot) fournit le lien de developpement
+# --- libcrypt.so. Sur une machine qui n'a que la bibliotheque d'execution
+# --- (libcrypt.so.1), -lcrypt echoue : on pointe alors sur le fichier reel.
+CRYPT="-lcrypt"
+if ! cc -o /dev/null -xc /dev/null -lcrypt >/dev/null 2>&1; then
+    for reelle in /lib/x86_64-linux-gnu/libcrypt.so.1 /usr/lib/x86_64-linux-gnu/libcrypt.so.1 /lib64/libcrypt.so.1; do
+        if [ -e "$reelle" ]; then CRYPT="$reelle"; break; fi
+    done
+fi
+
 # --- paquet fritax-login (nouveau) : make native ---
 INCS="-I$D/fritax-login/src -I$TERM"
 bloc "connexion (native)" fritax-login-native $D/fritax-login/src/main_native.c \
-    $D/fritax-login/src/login.c $TRONC $PLAT
+    $D/fritax-login/src/login.c $TRONC $PLAT $CRYPT
 
 # --- tests ---
 INCS="-I$TERM"
@@ -76,7 +87,7 @@ bloc "test du bureau" test_wm $D/fritax-shell/tests/test_wm.c $SHELL/wm.c $SHELL
     $SHELL/ipc.c $TRONC -lutil
 INCS="-I$D/fritax-login/src -I$TERM"
 bloc "test de l'ecran de connexion" test_login $D/fritax-login/tests/test_login.c \
-    $D/fritax-login/src/login.c $TRONC
+    $D/fritax-login/src/login.c $TRONC $CRYPT
 
 printf '\n════ Execution des tests ════\n'
 for t in test_login test_vt test_wm; do

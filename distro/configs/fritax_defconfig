@@ -41,6 +41,14 @@ BR2_LINUX_KERNEL_NEEDS_HOST_LIBELF=y
 BR2_KERNEL_HEADERS_6_12=y
 BR2_TOOLCHAIN_BUILDROOT_GLIBC=y
 BR2_TOOLCHAIN_BUILDROOT_CXX=y
+# Tables de clavier pour la console : sans ce paquet, loadkeys n'existe pas
+# dans l'image et la console reste en QWERTY americain, meme sur un clavier
+# AZERTY. C'est le script S10clavier qui charge ensuite la disposition.
+BR2_PACKAGE_KBD=y
+# libxcrypt fournit crypt() : c'est elle qui permet a l'ecran de connexion de
+# comparer un mot de passe au hachage de /etc/shadow. Sans ce paquet, la
+# liaison echoue sur -lcrypt.
+BR2_PACKAGE_LIBXCRYPT=y
 
 # --- identite du systeme ---
 BR2_TARGET_GENERIC_HOSTNAME="fritax-linux"

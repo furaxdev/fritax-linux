@@ -1,0 +1,49 @@
+#!/bin/sh
+#
+# Charge la disposition de clavier de la console.
+#
+# Sans ce script, le noyau reste en QWERTY americain : sur un clavier AZERTY
+# on tape "q" la ou on attend "a", et "/" demande la touche du bas a droite.
+# Notre bureau a sa propre table de touches (input.c), mais la console — le
+# shell de secours, les messages de demarrage, un futur mode texte — a besoin
+# de ce reglage.
+#
+# La disposition est lue dans /etc/fritax/clavier pour pouvoir en changer
+# sans recompiler l'image. "fr" (AZERTY) par defaut, puisque c'est une
+# distribution francaise a l'origine.
+
+DISPO=fr
+[ -r /etc/fritax/clavier ] && DISPO=$(cat /etc/fritax/clavier)
+[ -n "$DISPO" ] || DISPO=fr
+
+charge=0
+
+if [ -x /usr/bin/loadkeys ]; then
+    # 1) par nom : loadkeys trouve lui-meme le fichier dans son arborescence
+    if loadkeys "$DISPO" 2>/dev/null; then
+        charge=1
+    else
+        # 2) sinon on essaie les fichiers connus, un par un
+        for c in \
+            "/usr/share/keymaps/i386/azerty/$DISPO.map.gz" \
+            "/usr/share/keymaps/i386/azerty/$DISPO-latin1.map.gz" \
+            "/usr/share/keymaps/i386/qwerty/$DISPO.map.gz"
+        do
+            if [ -r "$c" ] && loadkeys "$c" 2>/dev/null; then
+                charge=1
+                break
+            fi
+        done
+    fi
+fi
+
+# 3) dernier recours : loadkmap de busybox, qui lit une table binaire
+if [ "$charge" -eq 0 ] && [ -x /bin/loadkmap ] && [ -r "/etc/keymap/${DISPO}.bmap" ]; then
+    loadkmap < "/etc/keymap/${DISPO}.bmap" && charge=1
+fi
+
+if [ "$charge" -eq 1 ]; then
+    echo "clavier : disposition $DISPO chargee"
+else
+    echo "clavier : aucune table pour '$DISPO' (la console reste en QWERTY americain)"
+fi
