@@ -61,6 +61,23 @@ static void on_scroll(void *u, int up) { (void)u; fx_ui_wheel(cursor_x, cursor_y
 #include <unistd.h>
 #include <sys/ioctl.h>
 #include <linux/kd.h>
+#include <signal.h>
+
+/* La console est passee en mode graphique pendant que le bureau tourne. Si on
+   nous arrete (Echap, kill, fin de session), il FAUT la remettre en mode texte,
+   sinon l'ecran reste fige sur la derniere image et on ne voit plus rien —
+   ni l'invite, ni le journal. C'est ce qui donnait l'impression d'un blocage. */
+static int console_tty = -1;
+
+static void remettre_console(int sig) {
+    (void)sig;
+    if (console_tty >= 0) {
+        ioctl(console_tty, KDSETMODE, KD_TEXT);
+        close(console_tty);
+        console_tty = -1;
+    }
+    _exit(0);
+}
 
 int main(int argc, char **argv) {
     const char *card = "/dev/dri/card0";
@@ -82,7 +99,11 @@ int main(int argc, char **argv) {
     /* On passe la console en mode graphique : le noyau arrete de redessiner le
        texte, et notre image reste a l'ecran. On la remet en mode texte en
        sortant, sinon le shell de secours devient invisible. */
+    signal(SIGINT, remettre_console);
+    signal(SIGTERM, remettre_console);
+    signal(SIGHUP, remettre_console);
     int tty0 = open("/dev/tty0", O_RDWR);
+    console_tty = tty0;
     if (tty0 >= 0) {
         if (ioctl(tty0, KDSETMODE, KD_GRAPHICS) == 0)
             fprintf(stderr, "fritax-shell: console passee en mode graphique\n");
@@ -93,7 +114,10 @@ int main(int argc, char **argv) {
     }
 
     fb = fx_screen_new(W, H); clean = fx_screen_new(W, H);
+    if (!fb || !clean) { fprintf(stderr, "fritax-shell: memoire insuffisante pour %dx%d\n", W, H); remettre_console(0); return 1; }
+    fprintf(stderr, "fritax-shell: tampons memoire prets\n");
     fx_ui_init(W, H, lp, 1);
+    fprintf(stderr, "fritax-shell: bureau initialise\n");
 
     /* fond : degrade Fritax, puis l'image par-dessus si elle existe */
     fx_gradient_v(clean, 0, 0, W, H, C_BG, C_BG2);
@@ -118,6 +142,7 @@ int main(int argc, char **argv) {
     }
 
     FXInputs *inputs = fx_inputs_open();
+    fprintf(stderr, "fritax-shell: entrees ouvertes (%s)\n", inputs ? "ok" : "aucune");
     cursor_x = W / 2; cursor_y = H - 80;
     int premiere_image = 1;
 

@@ -86,11 +86,15 @@ def taper(texte, pause=0.06):
     """
     # lettres deplacees par l'AZERTY
     deplace = {"a": "q", "q": "a", "z": "w", "w": "z", "m": "semicolon"}
-    # caracteres obtenus par une autre touche (avec ou sans majuscule)
+    # caracteres obtenus par une autre touche (avec ou sans majuscule).
+    # Sur un clavier francais, ">" et "<" sont sur la touche supplementaire a
+    # cote du shift gauche (que QEMU appelle "less"), et "&" est la touche "1"
+    # sans majuscule.
     autres = {
         " ": ("spc", False), "/": ("dot", True), ".": ("comma", True),
         "-": ("6", False), "=": ("equal", False), "_": ("8", False),
-        "'": ("4", False), ":": ("dot", False),
+        "'": ("4", False), ":": ("dot", False), "&": ("1", False),
+        ">": ("less", True), "<": ("less", False), ";": ("comma", False),
     }
     for c in texte:
         if c in deplace:
@@ -143,17 +147,31 @@ try:
     attente(6)
     capture("05-peripheriques")
 
-    # 6) on lance l'ecran de connexion a la main : l'erreur s'affichera
-    journalise("lancement direct de l'ecran de connexion")
-    taper("fritax-login"); entree()
-    attente(25)
-    capture("06-lancement-direct-ecran-connexion")
+    # 6) on lance l'ecran de connexion en arriere-plan, on regarde, on l'arrete
+    journalise("lancement de l'ecran de connexion (arriere-plan)")
+    taper("fritax-login >/tmp/connexion.log 2>&1 &"); entree()
+    attente(20)
+    capture("06-ecran-de-connexion-en-cours")
+    taper("killall fritax-login"); entree()
+    attente(4)
+    taper("cat /tmp/connexion.log"); entree()
+    attente(6)
+    capture("07-journal-ecran-de-connexion")
 
-    # 7) et le bureau tout seul
-    journalise("lancement direct du bureau")
-    taper("fritax-shell"); entree()
-    attente(30)
-    capture("07-lancement-direct-bureau")
+    # 7) pareil pour le bureau : en arriere-plan, sinon il bloque le terminal
+    journalise("lancement du bureau (arriere-plan)")
+    taper("fritax-shell >/tmp/bureau.log 2>&1 &"); entree()
+    attente(25)
+    capture("08-bureau-en-cours")
+    taper("killall fritax-shell"); entree()
+    attente(5)
+    capture("09-apres-arret-du-bureau")
+    taper("cat /tmp/bureau.log"); entree()
+    attente(6)
+    capture("10-journal-du-bureau")
+    taper("cat /root/.fritax-shell.log"); entree()
+    attente(6)
+    capture("11-journal-interne")
 finally:
     qemu.terminate()
     try:
