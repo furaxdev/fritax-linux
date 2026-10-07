@@ -1,180 +1,196 @@
 #!/usr/bin/env python3
 """
-Fonds d'ecran de Fritax Linux 1.2, style Fluent / Windows 11.
+Fonds d'ecran de Fritax Linux 1.2 — style Windows 11.
 
-On quitte le neon au profit de ce qui fait le look Windows 11 :
-  - fonds clairs et doux (gris tres pale, bleu lavande),
-  - une grande forme abstraite floue au centre (le fameux "Bloom"),
-  - des courbes lisses, aucune saturation, aucun contour dur,
-  - une variante sombre digne du theme sombre de Windows 11.
-
-Ecrits au format FXRLE (compresse, lu par le moteur) : ~3 Mo en brut
-deviennent une vingtaine de kilo-octets, et le systeme etant charge
-entierement en RAM, c'est de la memoire vive gagnee aussi.
+On ne fait PAS un flou. La structure du fond Windows 11, c'est un RUBAN qui
+s'enroule en spirale autour du centre (le "Bloom") : une bande large et
+courbe, avec
+  - des bords nets (ce n'est pas une tache),
+  - un biseau : le bord superieur prend la lumiere, l'interieur reste dans
+    l'ombre, ce qui donne l'epaisseur,
+  - une ombre portee la ou le ruban passe devant le fond,
+  - cinq copies tournees qui se recouvrent, la plus recente par-dessus.
+C'est cette STRUCTURE qu'on reproduit ici, pas une impression de flou.
 
     python3 tools/gen_fonds_fritax.py
 """
 import math, os
+import numpy as np
+from PIL import Image, ImageDraw, ImageFilter
 
 RACINE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SORTIE = os.path.join(RACINE, "distro", "board", "fritax", "rootfs-overlay", "usr", "share", "fritax")
 LARGEUR, HAUTEUR = 1366, 768
 MINI_W, MINI_H = 280, 158
+SS = 2                      # suréchantillonnage : on dessine 2x plus grand puis on réduit
 
 
-def ecrire_fx(chemin, W, H, pixels):
+# ---------------------------------------------------------------- ecriture
+def ecrire_fx(chemin, W, H, trame):
     """Format FXRLE : "FXRLE <largeur> <hauteur>\\n" puis des paquets
-    <1 octet = nombre de pixels moins un> <3 octets = R V B>."""
-    # On arrondit chaque composante sur 32 niveaux (pas de 8) avant de
-    # compresser. Un degrade Fluent est par nature fait de milliers de
-    # teintes presque identiques : sans arrondi, chaque pixel differe de son
-    # voisin et le RLE ne trouve aucune plage a compresser (4 Mo de fichiers).
-    # Avec l'arrondi, les plages se forment et la difference est invisible :
-    # l'oeil ne distingue pas 254 de 248 sur un fond tres clair.
-    pixels = [((p[0] >> 3) << 3 | 4, (p[1] >> 3) << 3 | 4, (p[2] >> 3) << 3 | 4)
-              for p in pixels]
-    paquets, i, total = [], 0, W * H
+    <1 octet = nombre de pixels moins un> <3 octets = R V B>.
+    Les teintes sont arrondies sur 32 niveaux : sans cet arrondi, un degrade
+    Fluent n'a aucune plage repetee et le RLE ne gagne rien."""
+    trame = ((trame >> 3) << 3 | 4).astype(np.uint8)
+    plat = trame.reshape(-1, 3)
+    paquets = bytearray()
+    for r, v, b in plat:
+        paquets += bytes((0, int(r), int(v), int(b)))
+    # compression : on fusionne les paquets identiques consecutifs
+    sortie = bytearray()
+    i, total = 0, len(plat)
     while i < total:
-        couleur = pixels[i]
+        c = plat[i]
         n = 1
-        while i + n < total and pixels[i + n] == couleur and n < 256:
+        while i + n < total and tuple(plat[i + n]) == tuple(c) and n < 256:
             n += 1
-        paquets.append(bytes((n - 1, couleur[0], couleur[1], couleur[2])))
+        sortie += bytes((n - 1, int(c[0]), int(c[1]), int(c[2])))
         i += n
     entete = ("FXRLE %d %d\n" % (W, H)).encode("ascii")
     with open(chemin, "wb") as f:
         f.write(entete)
-        f.write(b"".join(paquets))
-    return len(entete) + sum(len(p) for p in paquets)
+        f.write(bytes(sortie))
+    return len(entete) + len(sortie)
 
 
-def melange(a, b, t):
-    t = 0.0 if t < 0 else (1.0 if t > 1 else t)
-    return tuple(a[i] + (b[i] - a[i]) * t for i in range(3))
+def reduire(trame, nw, nh):
+    return np.array(Image.fromarray(trame).resize((nw, nh), Image.LANCZOS))
 
 
-def lisser(t):
-    """Courbe douce (cosinus) : aucune arête, comme dans Fluent."""
-    return 0.5 - 0.5 * math.cos(math.pi * max(0.0, min(1.0, t)))
+# ---------------------------------------------------------------- le ruban
+def masque_petale(W, H, angle_deg, enroulement=1.35, longueur=0.78,
+                  largeur0=0.030, largeur1=0.135, pivot=0.56):
+    """Dessine UN petale de ruban et renvoie son masque (L).
+
+    La courbe s'enroule autour du centre : on part du milieu, on tourne en
+    s'eloignant, et la bande s'elargit puis s'affine a la pointe — c'est ce
+    qui fait la feuille de Bloom plutot qu'un trait.
+    """
+    m = Image.new("L", (W, H), 0)
+    d = ImageDraw.Draw(m)
+    cx, cy = W / 2.0, H * 0.47
+    pas = 260
+    gauche, droite = [], []
+    for k in range(pas + 1):
+        t = k / pas
+        a = math.radians(angle_deg) + t * enroulement * math.tau * 0.42
+        r = (t ** pivot) * longueur * W * 0.62
+        # la bande est large au milieu, fine aux deux bouts
+        lw = (largeur0 + (largeur1 - largeur0) * math.sin(math.pi * min(1.0, t * 1.08)) ** 0.7)
+        lw *= W
+        nx, ny = -math.sin(a), math.cos(a)          # normale a la courbe
+        x, y = cx + math.cos(a) * r, cy + math.sin(a) * r
+        gauche.append((x + nx * lw / 2, y + ny * lw / 2))
+        droite.append((x - nx * lw / 2, y - ny * lw / 2))
+    d.polygon(gauche + droite[::-1], fill=255)
+    return m
 
 
-def bloom(W, H, fond_haut, fond_bas, petales, intensite=1.0, halo=None):
-    """Le "Bloom" : plusieurs nappes douces qui se recouvrent au centre,
-    chacune un degrade radial tres diffus. C'est ce qui donne l'effet
-    Fluent : des formes floues, jamais de bord net."""
-    cx, cy = 0.5, 0.44
-    pixels = []
-    for y in range(H):
-        ty = y / (H - 1)
-        base = melange(fond_haut, fond_bas, lisser(ty * 1.15))
-        for x in range(W):
-            c = base
-            rx = (x / (W - 1) - cx) * (W / H)     # on garde le cercle rond
-            ry = y / (H - 1) - cy
-            for (pcx, pcy, rayon, couleur, force) in petales:
-                dx, dy = rx - pcx, ry - pcy
-                d = math.sqrt(dx * dx + dy * dy) / rayon
-                if d < 1.0:
-                    c = melange(c, couleur, lisser((1.0 - d) * 1.6) * force * intensite)
-            if halo:
-                dx, dy = rx - halo[0], ry - halo[1]
-                d = math.sqrt(dx * dx + dy * dy) / halo[2]
-                if d < 1.0:
-                    c = melange(c, halo[3], lisser(1.0 - d) * 0.55 * intensite)
-            pixels.append(tuple(int(max(0, min(255, v))) for v in c))
-    return pixels
+def composer_petale(canevas, masque, couleur_haut, couleur_bas, lumiere=0.55, ombre=0.42):
+    """Compose un petale sur le canevas numpy (float 0..255) :
+       - un biseau (bord eclairci, coeur assombri) donne l'epaisseur,
+       - une ombre portee decalee le detache du fond."""
+    H, W = masque.size[1], masque.size[0]
+    # ombre portee : masque decale + flou
+    om = masque.filter(ImageFilter.GaussianBlur(W * 0.006))
+    om = om.transform(om.size, Image.AFFINE, (1, 0, -W * 0.012, 0, 1, H * 0.018), resample=Image.BILINEAR)
+    a_ombre = (np.asarray(om, dtype=np.float32) / 255.0)[..., None] * ombre
+    canevas *= (1.0 - a_ombre)
+    # biseau : bord clair (dilatation) et coeur sombre
+    bord = np.asarray(masque.filter(ImageFilter.MaxFilter(9)), dtype=np.float32) / 255.0
+    alpha = np.asarray(masque, dtype=np.float32) / 255.0
+    liseré = np.clip(bord - alpha, 0, 1)[..., None]
+    # degrade le long du petale : plus clair vers le haut du disque
+    yy = np.linspace(0.0, 1.0, H, dtype=np.float32)[:, None, None]
+    coul = (np.array(couleur_haut, np.float32) * (1 - yy) +
+            np.array(couleur_bas, np.float32) * yy)
+    coul = coul + liseré * lumiere * 255.0
+    a = alpha[..., None]
+    canevas = canevas * (1 - a) + coul * a
+    return canevas
 
 
-def reduire(pixels, W, H, nw, nh):
-    out = []
-    for y in range(nh):
-        y0, y1 = y * H // nh, max(y * H // nh + 1, (y + 1) * H // nh)
-        for x in range(nw):
-            x0, x1 = x * W // nw, max(x * W // nw + 1, (x + 1) * W // nw)
-            s = [0, 0, 0]; n = 0
-            for yy in range(y0, y1):
-                for xx in range(x0, x1):
-                    p = pixels[yy * W + xx]
-                    s[0] += p[0]; s[1] += p[1]; s[2] += p[2]; n += 1
-            out.append(tuple(v // max(1, n) for v in s))
-    return out
+def fond_uni(W, H, haut, bas):
+    yy = np.linspace(0.0, 1.0, H, dtype=np.float32)[:, None, None]
+    return (np.array(haut, np.float32) * (1 - yy) + np.array(bas, np.float32) * yy) * np.ones((H, W, 1), np.float32)
+
+
+def bloom(W, H, fond_haut, fond_bas, petales, base_angle=18.0, enroulement=1.35):
+    """Le Bloom complet : fond + les petales tournes qui se recouvrent."""
+    Ws, Hs = W * SS, H * SS
+    canevas = fond_uni(Ws, Hs, fond_haut, fond_bas)
+    for (angle, coul_haut, coul_bas, lum, omb, long, larg1) in petales:
+        m = masque_petale(Ws, Hs, angle + base_angle, enroulement=enroulement,
+                          longueur=long, largeur1=larg1)
+        canevas = composer_petale(canevas, m, coul_haut, coul_bas, lum, omb)
+    img = Image.fromarray(np.clip(canevas, 0, 255).astype(np.uint8))
+    return np.array(img.resize((W, H), Image.LANCZOS))
 
 
 # ---------------------------------------------------------------- les fonds
-def fond_bloom_clair():
-    """Le Bloom de Windows 11 en clair : bleu lavande sur un blanc bleute."""
-    petales = [(-0.06, -0.04, 0.62, (150, 200, 250), 0.85),
-               (0.10, 0.06, 0.55, (120, 175, 245), 0.75),
-               (-0.16, 0.12, 0.48, (185, 220, 252), 0.70),
-               (0.02, -0.18, 0.42, (205, 232, 255), 0.65),
-               (0.20, -0.06, 0.34, (145, 195, 248), 0.55)]
-    return bloom(LARGEUR, HAUTEUR, (250, 251, 253), (235, 241, 250), petales,
-                 halo=(0.42, 0.30, 0.50, (28, 105, 190)))
+def bloom_clair():
+    # bleus Fluent : #E8F1FB -> #2B7CD3, biseau tres lumineux
+    petales = [(0,   (250, 253, 255), (120, 180, 235), 0.75, 0.30, 0.80, 0.150),
+               (72,  (245, 250, 255), (150, 200, 245), 0.70, 0.30, 0.70, 0.130),
+               (144, (250, 253, 255), (110, 170, 232), 0.72, 0.28, 0.62, 0.115),
+               (216, (248, 252, 255), (170, 212, 248), 0.65, 0.26, 0.52, 0.100),
+               (288, (252, 254, 255), (135, 190, 240), 0.68, 0.24, 0.44, 0.088)]
+    return bloom(LARGEUR, HAUTEUR, (247, 250, 254), (226, 238, 250), petales)
 
 
-def fond_bloom_sombre():
-    """La version sombre, comme le theme sombre de Windows 11."""
-    petales = [(-0.06, -0.04, 0.62, (38, 76, 130), 0.80),
-               (0.10, 0.06, 0.55, (30, 60, 112), 0.72),
-               (-0.16, 0.12, 0.48, (26, 48, 88), 0.65),
-               (0.02, -0.18, 0.42, (34, 66, 116), 0.60),
-               (0.20, -0.06, 0.34, (24, 52, 96), 0.52)]
-    return bloom(LARGEUR, HAUTEUR, (32, 32, 36), (22, 22, 26), petales,
-                 halo=(0.40, 0.28, 0.48, (0, 103, 192)))
+def bloom_sombre():
+    petales = [(0,   (120, 170, 225), (28, 62, 108), 0.55, 0.55, 0.80, 0.150),
+               (72,  (95, 140, 200),  (22, 50, 90),  0.50, 0.55, 0.70, 0.130),
+               (144, (110, 160, 220), (30, 68, 118), 0.52, 0.52, 0.62, 0.115),
+               (216, (85, 130, 195),  (20, 46, 86),  0.46, 0.50, 0.52, 0.100),
+               (288, (100, 150, 210), (26, 56, 100), 0.48, 0.48, 0.44, 0.088)]
+    return bloom(LARGEUR, HAUTEUR, (32, 34, 40), (20, 22, 28), petales)
 
 
-def fond_lavande():
-    petales = [(0.02, 0.02, 0.70, (226, 220, 250), 0.80),
-               (-0.14, -0.08, 0.52, (236, 232, 252), 0.70),
-               (0.16, 0.10, 0.44, (214, 208, 246), 0.65)]
-    return bloom(LARGEUR, HAUTEUR, (252, 252, 255), (240, 238, 252), petales)
+def lavande():
+    petales = [(0,   (252, 250, 255), (168, 150, 230), 0.70, 0.26, 0.76, 0.140),
+               (90,  (250, 248, 255), (190, 175, 240), 0.62, 0.24, 0.60, 0.115),
+               (200, (252, 251, 255), (150, 132, 220), 0.66, 0.22, 0.48, 0.095)]
+    return bloom(LARGEUR, HAUTEUR, (251, 250, 254), (238, 235, 250), petales)
 
 
-def fond_gris_doux():
-    """Un gris neutre tres pale : le fond par defaut des bureaux Windows 11."""
-    petales = [(-0.04, -0.02, 0.58, (244, 245, 247), 0.70),
-               (0.12, 0.08, 0.46, (238, 240, 243), 0.60)]
-    return bloom(LARGEUR, HAUTEUR, (248, 249, 251), (238, 240, 244), petales)
+def gris_doux():
+    petales = [(0,   (253, 254, 255), (214, 220, 230), 0.55, 0.20, 0.78, 0.145),
+               (110, (252, 253, 255), (226, 231, 239), 0.48, 0.18, 0.58, 0.110)]
+    return bloom(LARGEUR, HAUTEUR, (250, 251, 253), (240, 242, 246), petales)
 
 
-def fond_aqua():
-    petales = [(-0.08, 0.02, 0.60, (150, 225, 232), 0.80),
-               (0.12, -0.06, 0.50, (110, 200, 220), 0.70),
-               (-0.10, 0.16, 0.42, (190, 238, 244), 0.62)]
-    return bloom(LARGEUR, HAUTEUR, (250, 253, 254), (232, 246, 250), petales,
-                 halo=(0.44, 0.30, 0.46, (0, 105, 140)))
+def aqua():
+    petales = [(0,   (250, 255, 255), (105, 205, 215), 0.72, 0.26, 0.78, 0.145),
+               (80,  (248, 254, 255), (140, 220, 228), 0.62, 0.24, 0.62, 0.118),
+               (190, (250, 255, 255), (85, 190, 205), 0.66, 0.22, 0.48, 0.095)]
+    return bloom(LARGEUR, HAUTEUR, (248, 253, 254), (228, 244, 248), petales)
 
 
-def fond_soleil_couchant():
-    """Un degrade doux orange/rose : le cote chaleureux de Fluent."""
-    petales = [(0.06, 0.10, 0.70, (255, 205, 170), 0.85),
-               (-0.12, 0.04, 0.52, (255, 225, 200), 0.70),
-               (0.14, -0.08, 0.44, (250, 185, 175), 0.60)]
-    return bloom(LARGEUR, HAUTEUR, (254, 250, 246), (250, 236, 226), petales,
-                 halo=(0.46, 0.26, 0.44, (240, 140, 90)))
+def soleil_couchant():
+    petales = [(0,   (255, 248, 240), (245, 150, 110), 0.75, 0.26, 0.78, 0.145),
+               (85,  (255, 250, 244), (250, 180, 130), 0.66, 0.24, 0.62, 0.118),
+               (195, (255, 250, 246), (240, 130, 120), 0.68, 0.22, 0.48, 0.095)]
+    return bloom(LARGEUR, HAUTEUR, (255, 252, 248), (252, 240, 230), petales)
 
 
-FONDS = [("fond-1", fond_bloom_clair),   # le Bloom, celui de Windows 11
-         ("fond-2", fond_bloom_sombre),  # sa version sombre
-         ("fond-3", fond_gris_doux),     # gris neutre tres pale
-         ("fond-4", fond_lavande),       # lavande
-         ("fond-5", fond_aqua),          # aqua
-         ("fond-6", fond_soleil_couchant)]
-
-NOMS = {"fond-1": "Bloom clair", "fond-2": "Bloom sombre", "fond-3": "Gris doux",
-        "fond-4": "Lavande", "fond-5": "Aqua", "fond-6": "Soleil couchant"}
+FONDS = [("fond-1", bloom_clair, "Bloom clair"),
+         ("fond-2", bloom_sombre, "Bloom sombre"),
+         ("fond-3", gris_doux, "Gris doux"),
+         ("fond-4", lavande, "Lavande"),
+         ("fond-5", aqua, "Aqua"),
+         ("fond-6", soleil_couchant, "Soleil couchant")]
 
 
 def main():
     os.makedirs(SORTIE, exist_ok=True)
     total = 0
-    for nom, fabrique in FONDS:
-        pixels = fabrique()
-        assert len(pixels) == LARGEUR * HAUTEUR, f"{nom} : nombre de pixels incorrect"
-        total += ecrire_fx(os.path.join(SORTIE, f"{nom}.fx"), LARGEUR, HAUTEUR, pixels)
-        total += ecrire_fx(os.path.join(SORTIE, f"{nom}-mini.fx"), MINI_W, MINI_H,
-                           reduire(pixels, LARGEUR, HAUTEUR, MINI_W, MINI_H))
-        print(f"  {nom}.fx  ({NOMS[nom]})")
+    for nom, fabrique, libelle in FONDS:
+        trame = fabrique()
+        assert trame.shape[:2] == (HAUTEUR, LARGEUR), f"{nom} : taille incorrecte"
+        total += ecrire_fx(os.path.join(SORTIE, f"{nom}.fx"), LARGEUR, HAUTEUR, trame)
+        total += ecrire_fx(os.path.join(SORTIE, f"{nom}-mini.fx"), MINI_W, MINI_H, reduire(trame, MINI_W, MINI_H))
+        print(f"  {nom}.fx  ({libelle})")
     print(f"total des 12 fichiers : {total/1024:.0f} Ko")
 
 
