@@ -22,19 +22,19 @@
 #include <strings.h>
 
 /* les fonds d'ecran proposes dans Reglages (dossier surchargeable par FRITAX_FONDS) */
-static char fonds[3][512], fonds_mini[3][512];
+#define NFONDS 6                    /* Nuit, Aurore, Graphite, Ocean, Foret, Neon */
+static char fonds[NFONDS][512], fonds_mini[NFONDS][512];
 static void init_fonds(void) {
     static int fait = 0;
     if (fait) return;
     fait = 1;
     const char *d = getenv("FRITAX_FONDS");
     if (!d || !*d) d = "/usr/share/fritax";
-    for (int i = 0; i < 3; i++) {
+    for (int i = 0; i < NFONDS; i++) {
         snprintf(fonds[i], sizeof fonds[i], "%s/fond-%d.fx", d, i + 1);
         snprintf(fonds_mini[i], sizeof fonds_mini[i], "%s/fond-%d-mini.fx", d, i + 1);
     }
 }
-#define NFONDS 3
 static int fond_choisi = 0, fond_change = 0;
 
 #define MAXENTS 256
@@ -443,7 +443,7 @@ int fx_wm_open_file(int i, const char *path) {
     if (w->tlen < 0) w->tlen = 0;
     w->text[w->tlen] = 0;
     w->tcur = w->tlen;
-    char *b = strrchr(path, '/');
+    const char *b = strrchr(path, '/');
     snprintf(w->title, sizeof w->title, "Bloc-notes - %s", b ? b + 1 : path);
     return 0;
 }
