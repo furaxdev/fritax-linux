@@ -192,12 +192,42 @@ void fx_draw_text_scale(FXScreen *s, int x, int y, const char *txt, uint32_t col
 }
 
 /* fichier brut : "FXRAW <w> <h>\n" puis w*h*3 octets RGB */
+/* Compresse un fond d'ecran a la volee : FXRLE.
+   Format : "FXRLE <largeur> <hauteur>\n" puis une suite de paquets
+   <1 octet : nombre de pixels moins un> <3 octets : R V B>.
+   Un fond d'ecran est fait de longues plages de meme couleur (degrade,
+   damier, rayons) : le RLE le divise par 50 a 100 sans rien perdre.
+   Un fichier de 3 Mo (FXRAW) tombe autour de 20 Ko. C'est de l'espace
+   gagne sur la cle ET de la RAM gagnee, puisque le systeme est charge
+   entierement en memoire au demarrage. */
+static int charger_rle(FXScreen *s, FILE *f, int w, int h) {
+    if (w <= 0 || h <= 0) return -1;
+    size_t total = (size_t)w * h, i = 0;
+    while (i < total) {
+        int compte = fgetc(f);
+        int r = fgetc(f), v = fgetc(f), b = fgetc(f);
+        if (compte < 0 || r < 0 || v < 0 || b < 0) break;
+        uint32_t c = ((uint32_t)r << 16) | ((uint32_t)v << 8) | (uint32_t)b;
+        for (int k = 0; k <= compte && i < total; k++, i++) {
+            int x = (int)(i % (size_t)w), y = (int)(i / (size_t)w);
+            if (y < s->h && x < s->w) s->px[(size_t)y * s->w + x] = c;
+        }
+    }
+    return 0;
+}
+
 int fx_load_raw_rgb(FXScreen *s, const char *path) {
     FILE *f = fopen(path, "rb");
     if (!f) return -1;
     char magic[8] = {0}; int w = 0, h = 0;
-    if (fscanf(f, "%5s %d %d", magic, &w, &h) != 3 || strcmp(magic, "FXRAW") != 0) { fclose(f); return -1; }
+    if (fscanf(f, "%5s %d %d", magic, &w, &h) != 3) { fclose(f); return -1; }
     fgetc(f);
+    if (strcmp(magic, "FXRLE") == 0) {
+        int r = charger_rle(s, f, w, h);
+        fclose(f);
+        return r;
+    }
+    if (strcmp(magic, "FXRAW") != 0) { fclose(f); return -1; }
     unsigned char *row = malloc((size_t)w * 3);
     if (!row) { fclose(f); return -1; }
     for (int y = 0; y < h && y < s->h; y++) {
