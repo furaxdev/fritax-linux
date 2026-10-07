@@ -45,7 +45,7 @@ static void logf_(const char *fmt, ...) {
 static void add_app(const char *name, const char *exec) {
     if (napps >= 128 || !name || !*name || !exec || !*exec) return;
     for (int i = 0; i < napps; i++) if (!strcmp(apps[i].name, name)) return;
-    static const uint32_t cols[] = { 0x5BC8FF, 0xF6AD55, 0x39DE8A, 0xD633FF, 0xFF7A7A, 0xA0AABE, 0x7ED6DF, 0xE1B12C };
+    static const uint32_t cols[] = { 0x0078D4, 0xE8A33D, 0x2D7D46, 0x8B5CF6, 0xC42B1C, 0x8A8A8A, 0x00838F, 0x9D5D00 };
     App *a = &apps[napps];
     snprintf(a->name, sizeof a->name, "%s", name);
     snprintf(a->exec, sizeof a->exec, "%s", exec);
@@ -184,7 +184,7 @@ static void draw_bar(FXScreen *s) {
     fx_blend_round_rect(s, bx, by, bw, bh, BAR_R, C_PANEL, 232);
 
     int px = bx + 8, py = by + (bh - BTN) / 2;
-    uint32_t bc = launcher_open ? C_CYAN : (hover_btn ? 0xE060FF : C_VIOLET);
+    uint32_t bc = launcher_open ? 0xDCE6F2 : (hover_btn ? 0xE5E5E5 : C_PANEL);
     fx_fill_round_rect(s, px, py, BTN, BTN, 10, bc);
     fx_draw_text_scale(s, px + (BTN - FONT_W * 2) / 2 + 1, py + (BTN - FONT_H * 2) / 2 + 2, "F", 0xFFFFFF, 2);
 
@@ -223,7 +223,7 @@ static void draw_launcher(FXScreen *s) {
         int tx = lx + 22 + col * (TILE_W + GRID_GAP), ty = ly + 56 + row * (TILE_H + GRID_GAP);
         int choisi = (i == sel_tile);
         fx_fill_round_rect(s, tx, ty, TILE_W, TILE_H, 16,
-                           choisi ? 0x2C3E5C : (hover == i ? 0x25344C : C_TILE));
+                           choisi ? 0xDCE6F2 : (hover == i ? 0xEDEDED : C_TILE));
         if (choisi) {                                   /* la tuile selectionnee est entouree */
             fx_fill_rect(s, tx + 12, ty + TILE_H - 4, TILE_W - 24, 3, C_CYAN);
         }
@@ -251,7 +251,9 @@ static void draw_launcher(FXScreen *s) {
 #define ICON_SZ 74
 static const char *ICON_NAMES[4] = { "Terminal", "Fichiers", "R\351glages", "Bloc-notes" };
 static const int ICON_APPS[4] = { FX_APP_TERMINAL, FX_APP_FILES, FX_APP_SETTINGS, FX_APP_EDITOR };
-static const uint32_t ICON_COLS[4] = { 0x5BC8FF, 0xF6AD55, 0xD633FF, 0x39DE8A };
+/* Teintes des tuiles du lanceur : celles de Windows 11 (bleu, ambre, vert,
+   violet profond), plus le cyan/magenta neon de la 1.1. */
+static const uint32_t ICON_COLS[4] = { 0x0078D4, 0xE8A33D, 0x2D7D46, 0x8B5CF6 };
 
 static void icon_geo(int i, int *ix, int *iy) {
     *ix = 40;

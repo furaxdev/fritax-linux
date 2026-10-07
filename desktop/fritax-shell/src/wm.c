@@ -70,13 +70,18 @@ static int res_win = -1, res_w0, res_h0, res_x0, res_y0;
 static FILE *LOG;
 static int accent_sel = 0;
 
-static const uint32_t ACCENTS[] = { 0xD633FF, 0x5BC8FF, 0x39DE8A, 0xF6AD55, 0xFF5C7A, 0xE1B12C };
+static const uint32_t ACCENTS[] = { 0x0067C0, 0x0078D4, 0x00838F, 0x2D7D46, 0xC239B3, 0xC42B1C };
 #define NACCENTS ((int)(sizeof ACCENTS / sizeof ACCENTS[0]))
 
-static const uint32_t W_VIOLET = 0xD633FF;
-static const uint32_t W_TITLE = 0x1A2438, W_BODY = 0x0F1626, W_FG = 0xEAF2FF,
-                      W_DIM = 0x7C93B5, W_SEL = 0x25344C, W_TOOLBAR = 0x16203A,
-                      W_FOLDER = 0xF6AD55, W_FILE = 0x8FA6C4;
+/* Couleurs Fluent (Windows 11) : surfaces claires, texte presque noir,
+   un seul accent bleu. L'ancienne palette etait bleu nuit avec du violet,
+   du cyan et du rose partout : c'est ce qu'on quitte en 1.2.
+   Les valeurs sont celles de Windows 11 : fond de fenetre blanc pur,
+   barre de titre tres pale, texte #1A1A1A, accent #0067C0. */
+static const uint32_t W_VIOLET = 0x0067C0;          /* l'accent, desormais bleu */
+static const uint32_t W_TITLE = 0xF9F9F9, W_BODY = 0xFFFFFF, W_FG = 0x1A1A1A,
+                      W_DIM = 0x5E5E5E, W_SEL = 0xE8E8E8, W_TOOLBAR = 0xF3F3F3,
+                      W_FOLDER = 0xE8A33D, W_FILE = 0x4A4A4A;
 
 static void init_fonds(void);
 

@@ -11,16 +11,20 @@
 #include "wm.h"
 
 /* theme */
-#define C_BG      0x0D1422
-#define C_BG2     0x10233F
-#define C_FG      0xEAF2FF
-#define C_DIM     0x7C93B5
-#define C_VIOLET  0xD633FF
-#define C_CYAN    0x5BC8FF
-#define C_GREEN   0x39DE8A
-#define C_ORANGE  0xF6AD55
-#define C_PANEL   0x111A2C
-#define C_TILE    0x1A263C
+/* Palette Fluent / Windows 11 (1.2). On quitte le bleu nuit, le violet et
+   le cyan neon : surfaces claires, texte presque noir, un seul accent bleu.
+   Valeurs reprises de Windows 11 : bureau #F3F3F3, surface blanche, texte
+   #1A1A1A, accent #0067C0, bordures #E5E5E5. */
+#define C_BG      0xF3F3F3
+#define C_BG2     0xE9E9E9
+#define C_FG      0x1A1A1A
+#define C_DIM     0x5E5E5E
+#define C_VIOLET  0x0067C0
+#define C_CYAN    0x0078D4
+#define C_GREEN   0x0F7B0F
+#define C_ORANGE  0x9D5D00
+#define C_PANEL   0xFFFFFF
+#define C_TILE    0xF7F7F7
 
 /* touches normalisees (independantes du backend) */
 enum { UI_KEY_NONE = 0, UI_KEY_ESC = 1, UI_KEY_SUPER = 2, UI_KEY_BACKSPACE = 3, UI_KEY_ENTER = 4, UI_KEY_LEFT = 5, UI_KEY_RIGHT = 6, UI_KEY_UP = 7, UI_KEY_DOWN = 8, UI_KEY_TAB = 9, UI_KEY_CLOSE = 10, UI_KEY_SAVE = 11 };
