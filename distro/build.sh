@@ -42,7 +42,7 @@ echo "== 2/4 : Buildroot ${BR_VER} =="
 # Makefile, qui echouait plus loin avec un message incomprehensible.
 if [ ! -f "$BR_DIR/Makefile" ]; then
   TAR="${HERE}/buildroot-${BR_VER}.tar.gz"
-  [ -s "$TAR" ] || wget -O "$TAR" "https://buildroot.org/downloads/buildroot-${BR_VER}.tar.gz" || {
+  [ -s "$TAR" ] || wget --tries=3 --waitretry=5 -O "$TAR" "https://buildroot.org/downloads/buildroot-${BR_VER}.tar.gz" || {
     echo "ECHEC: telechargement de Buildroot impossible"; exit 1; }
   tar -C "$HERE" -xzf "$TAR" || { echo "ECHEC: extraction de Buildroot impossible"; exit 1; }
 fi

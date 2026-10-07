@@ -43,7 +43,7 @@ jobs:
           # meme quand l'arbre Buildroot n'a pas ete telecharge. Tester le MAKEFILE.
           if [ ! -f buildroot-2026.02.3/Makefile ]; then
             echo "arbre Buildroot absent -> telechargement"
-            curl -fsSL -o br.tar.gz https://buildroot.org/downloads/buildroot-2026.02.3.tar.gz || { echo "ECHEC: telechargement de Buildroot impossible"; exit 1; }
+            curl -fsSL --retry 3 --retry-delay 5 --retry-all-errors -o br.tar.gz https://buildroot.org/downloads/buildroot-2026.02.3.tar.gz || { echo "ECHEC: telechargement de Buildroot impossible"; exit 1; }
             tar xzf br.tar.gz || { echo "ECHEC: extraction de Buildroot impossible"; exit 1; }
           fi
           [ -f buildroot-2026.02.3/Makefile ] || { echo "ECHEC: arbre Buildroot toujours absent"; exit 1; }
