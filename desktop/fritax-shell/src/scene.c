@@ -101,13 +101,13 @@ static int render_scene(const char *out, int W, int H, const char *wall) {
     if (!s) return 1;
 
     /* 1. fond d'ecran */
-    if (!wall || fx_load_raw_rgb(s, wall) != 0) fx_gradient_v(s, 0, 0, W, H, 0x0D1422, 0x10233F);
+    if (!wall || fx_load_raw_rgb(s, wall) != 0) fx_gradient_v(s, 0, 0, W, H, 0xF3F3F3, 0xE9E9E9);
 
     /* 2. icones du bureau (colonne de gauche) */
     int col = 84, y = 56;
-    desktop_icon(s, col, y,        0x5BC8FF, "T", "Terminal");  y += 130;
-    desktop_icon(s, col, y,        0xF6AD55, "F", "Fichiers");  y += 130;
-    desktop_icon(s, col, y,        0x9AA6BC, "C", "Corbeille");
+    desktop_icon(s, col, y,        0x0078D4, "T", "Terminal");  y += 130;
+    desktop_icon(s, col, y,        0xE8A33D, "F", "Fichiers");  y += 130;
+    desktop_icon(s, col, y,        0x8A8A8A, "C", "Corbeille");
 
     /* 3. la fenetre du terminal, avec le moteur en marche */
     int ww = 980, wh = 560, wx = (W - ww) / 2 + 40, wy = 150, tb = 40, PAD = 8;
@@ -124,22 +124,22 @@ static int render_scene(const char *out, int W, int H, const char *wall) {
 
     fx_fill_rect(win, 0, 0, ww, wh, 0x0F1626);
     /* barre de titre : le titre a gauche, nos boutons a droite */
-    fx_fill_rect(win, 0, 0, ww, tb, 0x1A2438);
-    fx_fill_rect(win, 0, tb - 1, ww, 1, 0x27354E);
+    fx_fill_rect(win, 0, 0, ww, tb, 0xF9F9F9);
+    fx_fill_rect(win, 0, tb - 1, ww, 1, 0xE5E5E5);
     /* petit losange violet = marque Fritax */
     fx_fill_round_rect(win, 16, tb / 2 - 4, 9, 9, 2, C_VIOLET);
-    fx_draw_text(win, 34, (tb - FONT_H) / 2, "Terminal", 0xEAF2FF);
+    fx_draw_text(win, 34, (tb - FONT_H) / 2, "Terminal", 0x1A1A1A);
     char t2[64];
     snprintf(t2, sizeof t2, "%dx%d", cols, rows);
-    fx_draw_text(win, 34 + 8 * FONT_W + 10, (tb - FONT_H) / 2, t2, 0x5C6E8C);
+    fx_draw_text(win, 34 + 8 * FONT_W + 10, (tb - FONT_H) / 2, t2, 0x5E5E5E);
     /* trois boutons separes, alignes a droite (style Fritax) */
     int bsz = 22, gap = 12, tot = 3 * bsz + 2 * gap;
     int bx = ww - tot - 18, by = (tb - bsz) / 2;
     window_button(win, bx, by, bsz, C_CYAN, 0);                       /* reduire */
     window_button(win, bx + bsz + gap, by, bsz, C_VIOLET, 1);         /* agrandir */
-    window_button(win, bx + 2 * (bsz + gap), by, bsz, 0xFF5C7A, 2);   /* fermer */
+    window_button(win, bx + 2 * (bsz + gap), by, bsz, 0xC42B1C, 2);   /* fermer */
     /* contenu du terminal, dans sa propre zone puis colle sous la barre de titre */
-    fx_render_vt(vt, content, 0, rows - 1, 0, 0xD633FF, 0x0F1626);
+    fx_render_vt(vt, content, 0, rows - 1, 0, 0x0078D4, 0x0F1626);
     for (int y = 0; y < ch; y++)
         memcpy(win->px + (size_t)(tb + PAD + y) * ww + PAD, content->px + (size_t)y * cw, (size_t)cw * sizeof(uint32_t));
 
@@ -149,8 +149,8 @@ static int render_scene(const char *out, int W, int H, const char *wall) {
 
     /* 4. la barre flottante avec les applis en cours */
     fx_ui_init(W, H, NULL, 0);
-    fx_ui_apercu_appli("Terminal", 0x5BC8FF);
-    fx_ui_apercu_appli("Fichiers", 0xF6AD55);
+    fx_ui_apercu_appli("Terminal", 0x0078D4);
+    fx_ui_apercu_appli("Fichiers", 0xE8A33D);
     fx_ui_render(s);
 
     /* 5. le curseur de la souris */

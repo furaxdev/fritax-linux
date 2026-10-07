@@ -1,36 +1,36 @@
-/* Fritax - chrome de fenetre : notre style, rien de macOS */
 #include "window.h"
 #include "appicon.h"
 
-#define C_TITLE 0x1A2438
-#define C_DARK  0x0F1626
-#define C_TEXT  0xEAF2FF
-#define C_DIM   0x5C6E8C
-#define C_VIOLET 0xD633FF
-#define C_CYAN   0x5BC8FF
-#define C_ROSE   0xFF5C7A
+/* Palette Fluent (Windows 11) : barre de titre tres pale, corps blanc,
+   texte presque noir. Les trois boutons ne sont plus des pastilles cyan,
+   violette et rose : ce sont des glyphes plats et sombres, comme dans
+   Windows 11, sans cadre ni pastille. */
+#define C_TITLE 0xF9F9F9
+#define C_DARK  0xFFFFFF
+#define C_TEXT  0x1A1A1A
+#define C_DIM   0x5E5E5E
+#define C_VIOLET 0x0067C0
+#define C_CYAN   0x5E5E5E
+#define C_ROSE   0xC42B1C
 
 void fx_window_button(FXScreen *s, int x, int y, int sz, uint32_t accent, int kind) {
-    fx_fill_round_rect(s, x, y, sz, sz, 7, 0x1C2740);
-    /* contour 2 px dans la couleur d'accent */
-    fx_fill_rect(s, x + 3, y - 1, sz - 6, 2, accent);
-    fx_fill_rect(s, x + 3, y + sz - 1, sz - 6, 2, accent);
-    fx_fill_rect(s, x - 1, y + 3, 2, sz - 6, accent);
-    fx_fill_rect(s, x + sz - 1, y + 3, 2, sz - 6, accent);
-    fx_fill_rect(s, x - 1, y + 3, 2, sz - 6, accent);
-    int m = 5;
+    /* Plus de carre arrondi ni de contour colore : juste le glyphe, fin,
+       centre, dans un gris tres sombre (le rouge ne sert qu'a la fermeture
+       quand on le demande explicitement). */
+    uint32_t c = (kind == 2 && accent != C_CYAN) ? C_ROSE : 0x3A3A3A;
+    int m = 4;
     if (kind == 0) {                                  /* reduire : un trait */
-        fx_fill_rect(s, x + m, y + sz / 2 - 1, sz - 2 * m, 3, accent);
+        fx_fill_rect(s, x + m, y + sz / 2 - 1, sz - 2 * m, 2, c);
     } else if (kind == 1) {                           /* agrandir : carre vide */
         int t = 2;
-        fx_fill_rect(s, x + m, y + m, sz - 2 * m, t, accent);
-        fx_fill_rect(s, x + m, y + sz - m - t, sz - 2 * m, t, accent);
-        fx_fill_rect(s, x + m, y + m, t, sz - 2 * m, accent);
-        fx_fill_rect(s, x + sz - m - t, y + m, t, sz - 2 * m, accent);
+        fx_fill_rect(s, x + m, y + m, sz - 2 * m, t, c);
+        fx_fill_rect(s, x + m, y + sz - m - t, sz - 2 * m, t, c);
+        fx_fill_rect(s, x + m, y + m, t, sz - 2 * m, c);
+        fx_fill_rect(s, x + sz - m - t, y + m, t, sz - 2 * m, c);
     } else {                                          /* fermer : une croix */
         for (int i = 0; i < sz - 2 * m; i++) {
-            fx_fill_rect(s, x + m + i, y + m + i, 2, 2, accent);
-            fx_fill_rect(s, x + sz - m - 1 - i, y + m + i, 2, 2, accent);
+            fx_fill_rect(s, x + m + i, y + m + i, 2, 2, c);
+            fx_fill_rect(s, x + sz - m - 1 - i, y + m + i, 2, 2, c);
         }
     }
 }
