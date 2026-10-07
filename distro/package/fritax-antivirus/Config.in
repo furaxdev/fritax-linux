@@ -1,0 +1,5 @@
+config BR2_PACKAGE_FRITAX_ANTIVIRUS
+	bool "fritax-antivirus"
+	help
+	  L'antivirus de Fritax Linux : scanner de signatures ecrit a la main, avec
+	  le fichier de test standard EICAR. La quarantaine ne supprime jamais les fichiers.

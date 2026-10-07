@@ -1,0 +1,6 @@
+[Desktop Entry]
+Type=Application
+Name=Antivirus
+Exec=/usr/bin/fritax-open fritax-antivirus
+Terminal=false
+Categories=Utility;

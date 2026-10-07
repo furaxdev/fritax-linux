@@ -41,6 +41,15 @@ static void logf_(const char *fmt, ...) {
     fputc('\n', LOG); fflush(LOG);
 }
 
+/* La police Fritax n'a pas de glyphe pour '.' (la case est vide) : on
+   remplace le point par le point median '·' (0xB7) pour l'affichage. */
+static void vis(const char *in, char *out, size_t n) {
+    size_t j = 0;
+    for (const char *p = in; *p && j + 1 < n; p++)
+        out[j++] = (*p == '.') ? (char)0xB7 : *p;
+    out[j] = 0;
+}
+
 /* ============================================================
  *  LE MOTEUR (aucun ecran : testable tout seul)
  * ============================================================ */
@@ -223,26 +232,30 @@ void fx_calc_draw(FXScreen *s) {
 
     /* le calcul en attente, en petit, en haut a droite */
     if (G.op) {
-        char acc[64], tb[80];
+        char acc[64], tb[80], tv[80];
         fx_calc_formate(G.acc, acc, sizeof acc);
         snprintf(tb, sizeof tb, "%s %c", acc, G.op);
-        int tw = (int)strlen(tb) * FONT_W;
-        fx_draw_text(s, px + pw - tw - 12, py + 8, tb, C_ORANGE);
+        vis(tb, tv, sizeof tv);
+        int tw = (int)strlen(tv) * FONT_W;
+        fx_draw_text(s, px + pw - tw - 12, py + 8, tv, C_ORANGE);
     }
 
     /* l'historique des 3 derniers calculs, en petit (plus ancien en haut) */
     for (int k = 0; k < G.nhisto; k++) {
-        const char *h = G.histo[G.nhisto - 1 - k];
-        fx_draw_text(s, px + 12, py + 8 + k * FONT_H, h, C_DIM);
+        char hv[96];
+        vis(G.histo[G.nhisto - 1 - k], hv, sizeof hv);
+        fx_draw_text(s, px + 12, py + 8 + k * FONT_H, hv, C_DIM);
     }
 
     /* la valeur courante, en grand, alignee a droite */
-    int len = (int)strlen(G.saisie);
+    char vv[64];
+    vis(G.saisie, vv, sizeof vv);
+    int len = (int)strlen(vv);
     int sc = 3, maxw = pw - 24;
     while (sc > 1 && len * FONT_W * sc > maxw) sc--;
     int vw = len * FONT_W * sc;
     int vy = py + ph - FONT_H * sc - 10;
-    fx_draw_text_scale(s, px + pw - 12 - vw, vy, G.saisie, G.erreur ? C_RED : C_FG, sc);
+    fx_draw_text_scale(s, px + pw - 12 - vw, vy, vv, G.erreur ? C_RED : C_FG, sc);
 
     /* --- les touches --- */
     int ch0 = 0;
@@ -260,9 +273,11 @@ void fx_calc_draw(FXScreen *s) {
             couleurs_touche(lab, &bg, &fg);
             fx_fill_round_rect(s, x, y, w, h, 8, bg);
             if (hover == r * 4 + c) fx_blend_round_rect(s, x, y, w, h, 8, 0xFFFFFF, 26);
-            int tw = (int)strlen(lab) * FONT_W * bsc;
+            char vlab[8];
+            vis(lab, vlab, sizeof vlab);
+            int tw = (int)strlen(vlab) * FONT_W * bsc;
             int th = FONT_H * bsc;
-            fx_draw_text_scale(s, x + (w - tw) / 2, y + (h - th) / 2, lab, fg, bsc);
+            fx_draw_text_scale(s, x + (w - tw) / 2, y + (h - th) / 2, vlab, fg, bsc);
         }
     }
 }

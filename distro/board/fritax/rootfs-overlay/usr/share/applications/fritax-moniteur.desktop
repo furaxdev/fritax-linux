@@ -1,0 +1,6 @@
+[Desktop Entry]
+Type=Application
+Name=Moniteur
+Exec=/usr/bin/fritax-open fritax-moniteur
+Terminal=false
+Categories=Utility;

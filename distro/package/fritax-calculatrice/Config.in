@@ -1,0 +1,5 @@
+config BR2_PACKAGE_FRITAX_CALCULATRICE
+	bool "fritax-calculatrice"
+	help
+	  La calculatrice de Fritax Linux : les quatre operations, le pourcentage
+	  et l'historique, a la souris comme au clavier.

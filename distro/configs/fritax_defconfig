@@ -90,3 +90,6 @@ BR2_TARGET_ROOTFS_ISO9660_HYBRID=y
 # generation echouait apres l'ISO et faisait echouer tout le job (donc l'ISO etait
 # jetee). On la desactive explicitement.
 # BR2_TARGET_ROOTFS_TAR is not set
+BR2_PACKAGE_FRITAX_ANTIVIRUS=y
+BR2_PACKAGE_FRITAX_CALCULATRICE=y
+BR2_PACKAGE_FRITAX_MONITEUR=y

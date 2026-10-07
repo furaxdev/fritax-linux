@@ -173,9 +173,10 @@ int fx_mon_key(int key) {
     return 0;
 }
 
+int fx_mon_valide(void) { return info.mem_total_mo > 0; }
+
 void fx_mon_demo(void) {
     mode_demo = 1;
-    memset(&info, 0, sizeof info);
     snprintf(info.cpu_modele, sizeof info.cpu_modele, "Fritax Virtual CPU @ 3.60 GHz");
     info.nb_coeurs    = 8;
     info.cpu_pct      = 37.5;

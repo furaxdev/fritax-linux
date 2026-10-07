@@ -72,7 +72,7 @@ grep -q '^BR2_KERNEL_HEADERS_6_12=y' .config || ERREUR="$ERREUR serie-en-tetes"
 grep -q '^BR2_TOOLCHAIN_BUILDROOT_UCLIBC=y' .config && ERREUR="$ERREUR uclibc-revenu"
 grep -q '^BR2_TOOLCHAIN_BUILDROOT_GLIBC=y' .config || ERREUR="$ERREUR glibc"
 grep -q '^BR2_LINUX_KERNEL=y' .config              || ERREUR="$ERREUR noyau"
-for p in BRANDING SHELL LOGIN TERMINAL FILES TUNNEL; do
+for p in BRANDING SHELL LOGIN TERMINAL FILES TUNNEL antivirus calculatrice moniteur; do
   grep -q "^BR2_PACKAGE_FRITAX_$p=y" .config || ERREUR="$ERREUR fritax-$p"
 done
 if [ -n "$ERREUR" ]; then

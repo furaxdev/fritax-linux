@@ -16,5 +16,6 @@ int  fx_mon_click(int x, int y);   /* 1 = demande de fermeture */
 int  fx_mon_move(int x, int y);
 int  fx_mon_key(int key);
 void fx_mon_demo(void);            /* valeurs factices pour les apercus sans /proc */
+int  fx_mon_valide(void);          /* 1 si le dernier releve /proc contient des valeurs */
 
 #endif

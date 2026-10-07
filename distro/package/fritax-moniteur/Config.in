@@ -1,0 +1,5 @@
+config BR2_PACKAGE_FRITAX_MONITEUR
+	bool "fritax-moniteur"
+	help
+	  Le moniteur systeme de Fritax Linux : processeur, memoire, swap, charge et
+	  temps de fonctionnement, lus directement dans /proc.

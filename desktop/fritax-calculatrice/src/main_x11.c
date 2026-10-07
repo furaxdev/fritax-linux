@@ -1,4 +1,4 @@
-/* Fritax Moniteur - moteur X11 (test) + mode apercu sans ecran */
+/* Fritax Calculatrice - moteur X11 (test) + mode apercu sans ecran */
 #define _GNU_SOURCE
 #ifndef FX_NO_X11
 #include <X11/Xlib.h>
@@ -25,17 +25,9 @@ static int render_to_file(const char *out, int w, int h) {
     W = w; H = h;
     fb = fx_screen_new(w, h);
     if (!fb) return 1;
-    fx_mon_init(w, h, NULL);
-    if (!fx_mon_valide()) fx_mon_demo();        /* vrai releve /proc, sinon apercu factice */
-    else {
-        /* 2e lecture apres un peu d'activite : le taux CPU devient reel */
-        volatile long x = 0;
-        for (long i = 0; i < 30000000L; i++) x += i;
-        usleep(150000);
-        fx_mon_key(FXM_RAFRAICHIR);
-        (void)x;
-    }
-    fx_mon_draw(fb);
+    fx_calc_init(w, h, NULL);
+    fx_calc_demo();
+    fx_calc_draw(fb);
     FILE *f = fopen(out, "wb");
     if (!f) return 1;
     fprintf(f, "P6\n%d %d\n255\n", w, h);
@@ -58,23 +50,23 @@ int main(int argc, char **argv) {
         }
     }
 #ifdef FX_NO_X11
-    fprintf(stderr, "fritax-moniteur: compile sans X11 (apercu seulement)\n");
+    fprintf(stderr, "fritax-calculatrice: compile sans X11 (apercu seulement)\n");
     return 0;
 #else
     const char *home = getenv("HOME");
     char lp[512];
-    snprintf(lp, sizeof lp, "%s/.fritax-moniteur.log", home ? home : "/tmp");
+    snprintf(lp, sizeof lp, "%s/.fritax-calculatrice.log", home ? home : "/tmp");
     dpy = XOpenDisplay(NULL);
-    if (!dpy) { fprintf(stderr, "fritax-moniteur: pas d'affichage X\n"); return 1; }
+    if (!dpy) { fprintf(stderr, "fritax-calculatrice: pas d'affichage X\n"); return 1; }
     int sc = DefaultScreen(dpy);
     vis = DefaultVisual(dpy, sc); depth = DefaultDepth(dpy, sc);
     if (DisplayWidth(dpy, sc) > 0) { W = DisplayWidth(dpy, sc); H = DisplayHeight(dpy, sc); }
     fb = fx_screen_new(W, H);
     if (!fb) return 1;
-    fx_mon_init(W, H, lp);
+    fx_calc_init(W, H, lp);
 
     win = XCreateSimpleWindow(dpy, RootWindow(dpy, sc), 0, 0, (unsigned)W, (unsigned)H, 0, BlackPixel(dpy, sc), 0);
-    XStoreName(dpy, win, "Moniteur - Fritax");
+    XStoreName(dpy, win, "Calculatrice - Fritax");
     XSelectInput(dpy, win, ExposureMask | KeyPressMask | ButtonPressMask | PointerMotionMask | StructureNotifyMask);
     Atom del = XInternAtom(dpy, "WM_DELETE_WINDOW", False);
     XSetWMProtocols(dpy, win, &del, 1);
@@ -88,8 +80,7 @@ int main(int argc, char **argv) {
 
     int running = 1;
     while (running) {
-        fx_mon_rafraichir();        /* relit /proc au plus une fois par seconde */
-        fx_mon_draw(fb);
+        fx_calc_draw(fb);
         if (img) XPutImage(dpy, win, gc, img, 0, 0, 0, 0, (unsigned)W, (unsigned)H);
         XFlush(dpy);
         fd_set rf; FD_ZERO(&rf);
@@ -100,12 +91,16 @@ int main(int argc, char **argv) {
         while (XPending(dpy)) {
             XEvent ev; XNextEvent(dpy, &ev);
             switch (ev.type) {
-            case ButtonPress: if (fx_mon_click(ev.xbutton.x, ev.xbutton.y)) running = 0; break;
-            case MotionNotify: fx_mon_move(ev.xmotion.x, ev.xmotion.y); break;
+            case ButtonPress: if (fx_calc_click(ev.xbutton.x, ev.xbutton.y)) running = 0; break;
+            case MotionNotify: fx_calc_move(ev.xmotion.x, ev.xmotion.y); break;
             case KeyPress: {
                 KeySym ks = XLookupKeysym(&ev.xkey, 0);
                 if (ks == XK_Escape) { running = 0; break; }
-                if (ks == XK_r || ks == XK_F5) fx_mon_key(FXM_RAFRAICHIR);
+                if (ks == XK_Return || ks == XK_KP_Enter) { fx_calc_key(FXC_ENTER); break; }
+                if (ks == XK_BackSpace) { fx_calc_key(FXC_BACK); break; }
+                if (ks == XK_Delete) { fx_calc_key(FXC_CLEAR); break; }
+                char buf[8]; int n = XLookupString(&ev.xkey, buf, sizeof buf, NULL, NULL);
+                if (n > 0) fx_calc_key((unsigned char)buf[0]);
                 break; }
             case ButtonRelease: break;
             case ClientMessage: if ((Atom)ev.xclient.data.l[0] == del) running = 0; break;

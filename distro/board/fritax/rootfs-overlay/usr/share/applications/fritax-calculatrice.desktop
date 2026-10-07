@@ -1,0 +1,6 @@
+[Desktop Entry]
+Type=Application
+Name=Calculatrice
+Exec=/usr/bin/fritax-open fritax-calculatrice
+Terminal=false
+Categories=Utility;
