@@ -39,9 +39,21 @@ jobs:
       - name: Verifier la configuration retenue
         run: |
           cd distro
-          [ -d buildroot-2026.02.3 ] || { curl -sL -o br.tar.gz https://buildroot.org/downloads/buildroot-2026.02.3.tar.gz && tar xzf br.tar.gz; }
+          # ATTENTION : le cache ne restaure que output/ , donc le dossier existe
+          # meme quand l'arbre Buildroot n'a pas ete telecharge. Tester le MAKEFILE.
+          if [ ! -f buildroot-2026.02.3/Makefile ]; then
+            echo "arbre Buildroot absent -> telechargement"
+            curl -fsSL -o br.tar.gz https://buildroot.org/downloads/buildroot-2026.02.3.tar.gz || { echo "ECHEC: telechargement de Buildroot impossible"; exit 1; }
+            tar xzf br.tar.gz || { echo "ECHEC: extraction de Buildroot impossible"; exit 1; }
+          fi
+          [ -f buildroot-2026.02.3/Makefile ] || { echo "ECHEC: arbre Buildroot toujours absent"; exit 1; }
           cd buildroot-2026.02.3
-          make BR2_EXTERNAL=.. fritax_defconfig >/dev/null 2>&1 || true
+          if ! make BR2_EXTERNAL=.. fritax_defconfig >/tmp/conf.log 2>&1; then
+            echo "ECHEC: la configuration Fritax n'a pas pu s'appliquer"
+            tail -20 /tmp/conf.log
+            exit 1
+          fi
+          [ -f .config ] || { echo "ECHEC: aucun .config genere"; exit 1; }
           echo "--- bibliotheque C / en-tetes retenus ---"
           grep -E '^BR2_(TOOLCHAIN_BUILDROOT_(GLIBC|UCLIBC|MUSL)|KERNEL_HEADERS_AS_KERNEL|DEFAULT_KERNEL_HEADERS|LINUX_KERNEL)=' .config || echo "  (aucune)"
           grep -E '^BR2_TOOLCHAIN_HEADERS_AT_LEAST_' .config | head -5 || true

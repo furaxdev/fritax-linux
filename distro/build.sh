@@ -36,11 +36,17 @@ if [ -n "$MISSING" ]; then
 fi
 
 echo "== 2/4 : Buildroot ${BR_VER} =="
-if [ ! -d "$BR_DIR" ]; then
+# On teste le MAKEFILE et pas le dossier : le cache du nuage ne restaure que
+# output/, donc "$BR_DIR" peut exister alors que l'arbre Buildroot, lui, n'a
+# jamais ete telecharge. Tester le dossier laissait alors passer un make sans
+# Makefile, qui echouait plus loin avec un message incomprehensible.
+if [ ! -f "$BR_DIR/Makefile" ]; then
   TAR="${HERE}/buildroot-${BR_VER}.tar.gz"
-  [ -f "$TAR" ] || wget -O "$TAR" "https://buildroot.org/downloads/buildroot-${BR_VER}.tar.gz"
-  tar -C "$HERE" -xzf "$TAR"
+  [ -s "$TAR" ] || wget -O "$TAR" "https://buildroot.org/downloads/buildroot-${BR_VER}.tar.gz" || {
+    echo "ECHEC: telechargement de Buildroot impossible"; exit 1; }
+  tar -C "$HERE" -xzf "$TAR" || { echo "ECHEC: extraction de Buildroot impossible"; exit 1; }
 fi
+[ -f "$BR_DIR/Makefile" ] || { echo "ECHEC: arbre Buildroot toujours absent"; exit 1; }
 
 echo "== 3/4 : configuration de Fritax Linux =="
 cd "$BR_DIR"
