@@ -97,6 +97,12 @@ def taper(texte, pause=0.06):
         ">": ("less", True), "<": ("less", False), ";": ("comma", False),
     }
     for c in texte:
+        if c.isdigit():
+            # sur un clavier francais, les chiffres sont en Majuscule
+            commande("send-key", keys=[{"type": "qcode", "data": "shift"},
+                                       {"type": "qcode", "data": c}])
+            time.sleep(pause)
+            continue
         if c in deplace:
             commande("send-key", keys=[{"type": "qcode", "data": deplace[c]}])
         elif c in autres:
@@ -147,31 +153,27 @@ try:
     attente(6)
     capture("05-peripheriques")
 
-    # 6) on lance l'ecran de connexion en arriere-plan, on regarde, on l'arrete
-    journalise("lancement de l'ecran de connexion (arriere-plan)")
-    taper("fritax-login >/tmp/connexion.log 2>&1 &"); entree()
+    # 6) lancement du bureau. On ne redirige PAS la sortie et on ne met pas en
+    #    arriere-plan : taper ">" et "&" sur un clavier francais demandait des
+    #    combinaisons de touches que le test ratait (c'est pourquoi il n'a jamais
+    #    lance le bureau). Ici il tourne au premier plan : on regarde l'ecran,
+    #    puis QEMU est arrete de toute facon a la fin du test.
+    journalise("lancement du bureau (au premier plan)")
+    taper("fritax-shell"); entree()
+    attente(12)
+    capture("06-bureau-12-secondes")
     attente(20)
-    capture("06-ecran-de-connexion-en-cours")
-    taper("killall fritax-login"); entree()
-    attente(4)
-    taper("cat /tmp/connexion.log"); entree()
-    attente(6)
-    capture("07-journal-ecran-de-connexion")
+    capture("07-bureau-32-secondes")
 
-    # 7) pareil pour le bureau : en arriere-plan, sinon il bloque le terminal
-    journalise("lancement du bureau (arriere-plan)")
-    taper("fritax-shell >/tmp/bureau.log 2>&1 &"); entree()
-    attente(25)
-    capture("08-bureau-en-cours")
-    taper("killall fritax-shell"); entree()
-    attente(5)
-    capture("09-apres-arret-du-bureau")
-    taper("cat /tmp/bureau.log"); entree()
-    attente(6)
-    capture("10-journal-du-bureau")
+    # 7) on l'arrete et on lit son journal interne
+    journalise("arret du bureau")
+    commande("send-key", keys=[{"type": "qcode", "data": "ctrl"},
+                               {"type": "qcode", "data": "c"}])
+    attente(4)
+    capture("08-apres-arret")
     taper("cat /root/.fritax-shell.log"); entree()
     attente(6)
-    capture("11-journal-interne")
+    capture("09-journal-interne-du-bureau")
 finally:
     qemu.terminate()
     try:
