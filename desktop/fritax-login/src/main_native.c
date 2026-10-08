@@ -56,6 +56,7 @@ int main(int argc, char **argv) {
     FXInputs *in = fx_inputs_open();
     cx = W / 2; cy = H / 2;
 
+    int echecs_affichage = 0;
     while (!quit) {
         log_.curseur = ((ticks / 5) % 2) ? 1 : 0;      /* clignotement du curseur */
         ticks++;
@@ -63,7 +64,20 @@ int main(int argc, char **argv) {
         FXDrmBuf *b = bufs[cur];
         for (int y = 0; y < H; y++)
             memcpy((char *)b->map + (size_t)y * b->pitch, fb->px + (size_t)y * W, (size_t)W * 4);
-        fx_drm_buf_flip(drm, b);
+
+        /* Si l'ecran nous refuse l'image (un autre programme le tient), on
+           sort en erreur au bout de trois essais : le surveillant du demarrage
+           peut alors passer la main au bureau au lieu de boucler sans fin. */
+        if (fx_drm_buf_flip(drm, b) != 0) {
+            if (++echecs_affichage >= 3) {
+                fprintf(stderr, "fritax-login: l'affichage est refuse, ecran occupe\n");
+                fx_inputs_close(in);
+                fx_drm_close(drm);
+                return 2;
+            }
+        } else {
+            echecs_affichage = 0;
+        }
         cur ^= 1;
 
         if (log_.etat == FXL_CONNECTE) { connecte = 1; break; }

@@ -145,6 +145,7 @@ int main(int argc, char **argv) {
     fprintf(stderr, "fritax-shell: entrees ouvertes (%s)\n", inputs ? "ok" : "aucune");
     cursor_x = W / 2; cursor_y = H - 80;
     int premiere_image = 1;
+    int echecs_affichage = 0;
 
     int running = 1;
     while (running) {
@@ -170,10 +171,21 @@ int main(int argc, char **argv) {
         FXDrmBuf *b = bufs[cur];
         for (int y = 0; y < H; y++)
             memcpy((char *)b->map + (size_t)y * b->pitch, fb->px + (size_t)y * W, (size_t)W * 4);
-        fx_drm_buf_flip(drm, b);
-        if (premiere_image) {
-            fprintf(stderr, "fritax-shell: premiere image affichee\n");
-            premiere_image = 0;
+        /* Si l'ecran refuse l'image, c'est qu'un autre programme le tient.
+           On ne boucle pas : on sort, et la sortie propre remet la console en
+           mode texte, ce qui laisse un ecran lisible et utilisable. */
+        if (fx_drm_buf_flip(drm, b) != 0) {
+            if (++echecs_affichage >= 3) {
+                fprintf(stderr, "fritax-shell: affichage refuse, ecran occupe par "
+                                "un autre programme — on rend la main\n");
+                break;
+            }
+        } else {
+            echecs_affichage = 0;
+            if (premiere_image) {
+                fprintf(stderr, "fritax-shell: premiere image affichee\n");
+                premiere_image = 0;
+            }
         }
         cur ^= 1;
         if (fx_ui_wants_close()) break;
