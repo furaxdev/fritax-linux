@@ -29,10 +29,27 @@ static void logf_(const char *fmt, ...) {
     va_list ap; va_start(ap, fmt); vfprintf(GLOG, fmt, ap); va_end(ap); fputc('\n', GLOG); fflush(GLOG);
 }
 
+/* La carte graphique n'accepte qu'UN seul maitre a la fois : le programme qui
+   la detient peut changer l'image, les autres recoivent "Permission denied" a
+   chaque tentative. Sans cette demande explicite, on dependait du hasard de
+   l'ordre de demarrage — et un ancien bureau reste en vie suffisait a tout
+   bloquer, avec un flot de "SETCRTC: Permission denied". */
+static int devenir_maitre(int fd) {
+    return ioctl(fd, DRM_IOCTL_SET_MASTER, 0);
+}
+
 FXDrm *fx_drm_open(const char *card) {
     FXDrm *d = calloc(1, sizeof(FXDrm));
     if (!d) return NULL;
     d->fd = open(card, O_RDWR | O_CLOEXEC);
+    if (d->fd >= 0) {
+        if (devenir_maitre(d->fd) == 0) {
+            logf_("ecran : maitrise obtenue");
+        } else {
+            logf_("ecran : un autre programme tient deja l'affichage (%s) — "
+                  "lance 'killall fritax-shell fritax-login' puis reessaie", strerror(errno));
+        }
+    }
     if (d->fd < 0) { logf_("ouverture %s : %s", card, strerror(errno)); free(d); return NULL; }
 
     struct drm_mode_card_res res;
@@ -85,7 +102,14 @@ fail:
     close(d->fd); free(d); return NULL;
 }
 
-void fx_drm_close(FXDrm *d) { if (d) { if (d->fd >= 0) close(d->fd); free(d); } }
+void fx_drm_close(FXDrm *d) {
+    if (!d) return;
+    if (d->fd >= 0) {
+        ioctl(d->fd, DRM_IOCTL_DROP_MASTER, 0);   /* on rend l'ecran au suivant */
+        close(d->fd);
+    }
+    free(d);
+}
 int fx_drm_width(FXDrm *d) { return d->w; }
 int fx_drm_height(FXDrm *d) { return d->h; }
 int fx_drm_fd(FXDrm *d) { return d->fd; }
@@ -114,7 +138,16 @@ int fx_drm_buf_flip(FXDrm *d, FXDrmBuf *b) {
     c.crtc_id = d->crtc_id; c.fb_id = b->fb_id;
     c.set_connectors_ptr = (uint64_t)(uintptr_t)&d->conn_id; c.count_connectors = 1;
     c.mode = d->mode; c.mode_valid = 1;
-    if (ioctl(d->fd, DRM_IOCTL_MODE_SETCRTC, &c)) { logf_("SETCRTC: %s", strerror(errno)); return -1; }
+    if (ioctl(d->fd, DRM_IOCTL_MODE_SETCRTC, &c)) {
+        /* Une seule fois : sinon le journal reçoit une ligne par image, soit des
+           milliers par minute, et on ne lit plus rien d'autre. */
+        static int deja_signale = 0;
+        if (!deja_signale++) {
+            logf_("SETCRTC refuse (%s) : un autre programme tient l'affichage. "
+                  "Ferme-le ('killall fritax-shell fritax-login') puis relance.", strerror(errno));
+        }
+        return -1;
+    }
     return 0;
 }
 
