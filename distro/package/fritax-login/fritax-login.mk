@@ -16,13 +16,16 @@ endef
 define FRITAX_LOGIN_INSTALL_TARGET_CMDS
 	$(INSTALL) -D -m 0755 $(@D)/fritax-login/fritax-login-native \
 		$(TARGET_DIR)/usr/bin/fritax-login
-	# Volontairement PAS dans /etc/init.d : l'ecran de connexion ne doit pas
-	# demarrer tout seul. Il ouvrait la carte graphique avant le bureau, et la
-	# carte graphique n'accepte qu'un seul maitre a la fois : le bureau recevait
-	# alors "SETCRTC: Permission denied" en boucle. Le programme reste lanceable
-	# a la main (fritax-login).
-	$(INSTALL) -D -m 0755 $(BR2_EXTERNAL_FRITAX_LINUX_PATH)/board/fritax/rootfs-overlay/etc/init.d/S30fritax-login \
-		$(TARGET_DIR)/usr/share/fritax/desactive/S30fritax-login
+	# Volontairement AUCUN script de demarrage : l'ecran de connexion ne doit
+	# pas se lancer tout seul. Il ouvrait la carte graphique avant le bureau, et
+	# la carte n'accepte qu'un seul maitre a la fois : le bureau recevait alors
+	# "SETCRTC: Permission denied" en boucle, sans rien afficher.
+	#
+	# Le script existe toujours, range par l'overlay dans
+	# /usr/share/fritax/desactive/ : il est disponible a la main si besoin, mais
+	# rien ne l'appelle. Attention, l'overlay (BR2_ROOTFS_OVERLAY) copie son
+	# contenu TEL QUEL dans le systeme : il ne suffit pas de retirer la ligne ici,
+	# il faut aussi que le fichier ne soit plus dans rootfs-overlay/etc/init.d/.
 endef
 
 $(eval $(generic-package))
