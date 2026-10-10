@@ -167,12 +167,12 @@ try:
     #    carte a ete prise et la console detachee, la fin dit si l'affichage a
     #    ete accepte.
     journalise("journal du bureau : debut")
-    taper("head -25 /root/.fritax-shell.log"); entree()
+    taper("head -30 /var/log/fritax-shell.log"); entree()
     attente(6)
     capture("07-journal-debut")
 
     journalise("journal du bureau : fin")
-    taper("tail -25 /root/.fritax-shell.log"); entree()
+    taper("tail -30 /var/log/fritax-shell.log"); entree()
     attente(6)
     capture("08-journal-fin")
 

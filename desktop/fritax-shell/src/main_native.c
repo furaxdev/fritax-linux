@@ -85,9 +85,15 @@ int main(int argc, char **argv) {
     const char *card = "/dev/dri/card0";
     for (int i = 1; i < argc; i++) if (!strcmp(argv[i], "--card") && i + 1 < argc) card = argv[++i];
 
+    /* Le journal doit etre au meme endroit quel que soit le lanceur. Au
+       demarrage, HOME n'est pas defini : le journal partait alors dans /tmp
+       pendant que le test le cherchait dans le dossier de root, et on croyait
+       que le bureau n'avait rien dit. Un chemin fixe regle ca definitivement. */
     const char *home = getenv("HOME");
     char lp[512];
-    snprintf(lp, sizeof lp, "%s/.fritax-shell.log", home ? home : "/tmp");
+    snprintf(lp, sizeof lp, "/var/log/fritax-shell.log");
+    if (access(lp, W_OK) != 0)
+        snprintf(lp, sizeof lp, "/tmp/fritax-shell.log");
     fx_drm_log_path(lp); fx_inputs_log_path(lp);
 
     /* Un seul bureau a la fois. La carte graphique n'accepte qu'un maitre :
