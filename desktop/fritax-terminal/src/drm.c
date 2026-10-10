@@ -10,6 +10,7 @@
 #include <stdarg.h>
 #include <sys/ioctl.h>
 #include <sys/mman.h>
+#include <dirent.h>
 #include <linux/types.h>
 #include <drm/drm.h>
 #include <drm/drm_mode.h>
@@ -21,6 +22,89 @@ struct FXDrm {
     struct drm_mode_modeinfo mode;
     int w, h;
 };
+
+/* ------------------------------------------------------------------------
+   La console texte du noyau reste attachee a la carte graphique, et tant
+   qu'elle l'est, tout changement d'affichage est refuse : du point de vue du
+   noyau, c'est elle qui tient l'ecran.
+
+   La methode standard consiste a detacher la console le temps que le bureau
+   dessine, puis a la rattacher en partant pour que le texte redevienne
+   utilisable. Sans ce detachement, on obtient un refus permanent, quel que
+   soit l'ordre dans lequel on ouvre la carte.
+   ------------------------------------------------------------------------ */
+static char CHEMIN_CONSOLE[160];
+
+/* declaree plus bas : ces fonctions en ont besoin avant sa definition */
+static void logf_(const char *fmt, ...);
+
+static void detacher_console(void) {
+    for (int i = 0; i < 8; i++) {
+        char nom[192], contenu[160] = {0};
+        snprintf(nom, sizeof nom, "/sys/class/vtconsole/vtcon%d/name", i);
+        FILE *f = fopen(nom, "r");
+        if (!f) continue;
+        char *lu = fgets(contenu, sizeof contenu, f);
+        fclose(f);
+        if (!lu || !strstr(contenu, "frame buffer")) continue;
+
+        snprintf(CHEMIN_CONSOLE, sizeof CHEMIN_CONSOLE,
+                 "/sys/class/vtconsole/vtcon%d/bind", i);
+        FILE *b = fopen(CHEMIN_CONSOLE, "w");
+        if (b) {
+            fputs("0", b);
+            fclose(b);
+            logf_("console texte detachee : la carte est libre pour le bureau");
+        }
+        return;
+    }
+    logf_("console texte non trouvee dans /sys/class/vtconsole");
+}
+
+static void rattacher_console(void) {
+    if (!CHEMIN_CONSOLE[0]) return;
+    FILE *b = fopen(CHEMIN_CONSOLE, "w");
+    if (b) {
+        fputs("1", b);
+        fclose(b);
+        logf_("console texte rattachee");
+    }
+    CHEMIN_CONSOLE[0] = 0;
+}
+
+/* Qui a la carte ouverte, en ce moment ? C'est ce qui permet de nommer le
+   programme fautif dans le journal au lieu de le chercher a l'aveugle. */
+static void qui_tient_la_carte(const char *carte) {
+    DIR *proc = opendir("/proc");
+    if (!proc) return;
+    struct dirent *e;
+    while ((e = readdir(proc))) {
+        if (e->d_name[0] < '0' || e->d_name[0] > '9') continue;
+        char dossier[80];
+        snprintf(dossier, sizeof dossier, "/proc/%s/fd", e->d_name);
+        DIR *fds = opendir(dossier);
+        if (!fds) continue;
+        struct dirent *d;
+        int trouve = 0;
+        while (!trouve && (d = readdir(fds))) {
+            char lien[600], cible[600];
+            snprintf(lien, sizeof lien, "%s/%s", dossier, d->d_name);
+            ssize_t n = readlink(lien, cible, sizeof cible - 1);
+            if (n <= 0) continue;
+            cible[n] = 0;
+            if (strcmp(cible, carte)) continue;
+            trouve = 1;
+            char cmd[300] = {0}, chemin[80];
+            snprintf(chemin, sizeof chemin, "/proc/%s/cmdline", e->d_name);
+            FILE *c = fopen(chemin, "r");
+            if (c) { size_t l = fread(cmd, 1, sizeof cmd - 1, c); cmd[l] = 0; fclose(c); }
+            for (size_t i = 0; i < strlen(cmd); i++) if (cmd[i] == 0) cmd[i] = ' ';
+            logf_("  la carte est ouverte par pid %s : %s", e->d_name, cmd);
+        }
+        closedir(fds);
+    }
+    closedir(proc);
+}
 
 static FILE *GLOG;
 void fx_drm_log_path(const char *p) { if (p) GLOG = fopen(p, "w"); }
@@ -45,6 +129,7 @@ FXDrm *fx_drm_open(const char *card) {
     if (d->fd >= 0) {
         if (devenir_maitre(d->fd) == 0) {
             logf_("ecran : maitrise obtenue");
+            detacher_console();
         } else {
             logf_("ecran : un autre programme tient deja l'affichage (%s) — "
                   "lance 'killall fritax-shell fritax-login' puis reessaie", strerror(errno));
@@ -106,6 +191,7 @@ void fx_drm_close(FXDrm *d) {
     if (!d) return;
     if (d->fd >= 0) {
         ioctl(d->fd, DRM_IOCTL_DROP_MASTER, 0);   /* on rend l'ecran au suivant */
+        rattacher_console();                      /* et on redonne la console */
         close(d->fd);
     }
     free(d);
@@ -143,8 +229,8 @@ int fx_drm_buf_flip(FXDrm *d, FXDrmBuf *b) {
            milliers par minute, et on ne lit plus rien d'autre. */
         static int deja_signale = 0;
         if (!deja_signale++) {
-            logf_("SETCRTC refuse (%s) : un autre programme tient l'affichage. "
-                  "Ferme-le ('killall fritax-shell fritax-login') puis relance.", strerror(errno));
+            logf_("SETCRTC refuse (%s) : un autre programme tient l'affichage.", strerror(errno));
+            qui_tient_la_carte("/dev/dri/card0");
         }
         return -1;
     }
