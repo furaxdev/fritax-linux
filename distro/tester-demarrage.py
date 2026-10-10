@@ -153,27 +153,34 @@ try:
     attente(6)
     capture("05-peripheriques")
 
-    # 6) lancement du bureau. On ne redirige PAS la sortie et on ne met pas en
-    #    arriere-plan : taper ">" et "&" sur un clavier francais demandait des
-    #    combinaisons de touches que le test ratait (c'est pourquoi il n'a jamais
-    #    lance le bureau). Ici il tourne au premier plan : on regarde l'ecran,
-    #    puis QEMU est arrete de toute facon a la fin du test.
-    journalise("lancement du bureau (au premier plan)")
-    taper("fritax-shell"); entree()
-    attente(12)
-    capture("06-bureau-12-secondes")
-    attente(20)
-    capture("07-bureau-32-secondes")
+    # 6) Le bureau demarre TOUT SEUL au demarrage depuis le correctif. On ne le
+    #    lance donc pas ici : un deuxieme bureau se disputerait la carte
+    #    graphique avec le premier et le test conclurait a un faux echec — c'est
+    #    exactement ce qui s'est produit au test #12, ou le journal accusait
+    #    deux pid pour le meme programme.
+    journalise("qui tourne ? (le bureau doit etre la, une seule fois)")
+    taper("ps"); entree()
+    attente(8)
+    capture("06-processus-en-cours")
 
-    # 7) on l'arrete et on lit son journal interne
-    journalise("arret du bureau")
-    commande("send-key", keys=[{"type": "qcode", "data": "ctrl"},
-                               {"type": "qcode", "data": "c"}])
-    attente(4)
-    capture("08-apres-arret")
-    taper("cat /root/.fritax-shell.log"); entree()
+    # 7) Le journal du bureau. On lit le DEBUT et la FIN : le debut dit si la
+    #    carte a ete prise et la console detachee, la fin dit si l'affichage a
+    #    ete accepte.
+    journalise("journal du bureau : debut")
+    taper("head -25 /root/.fritax-shell.log"); entree()
     attente(6)
-    capture("09-journal-interne-du-bureau")
+    capture("07-journal-debut")
+
+    journalise("journal du bureau : fin")
+    taper("tail -25 /root/.fritax-shell.log"); entree()
+    attente(6)
+    capture("08-journal-fin")
+
+    # 8) On arrete le bureau : la console texte doit revenir.
+    journalise("arret du bureau, la console doit revenir")
+    taper("killall fritax-shell"); entree()
+    attente(8)
+    capture("09-apres-arret-du-bureau")
 finally:
     qemu.terminate()
     try:

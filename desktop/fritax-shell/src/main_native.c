@@ -10,6 +10,8 @@
 #include <poll.h>
 #include <time.h>
 #include <signal.h>
+#include <fcntl.h>
+#include <sys/file.h>
 
 #include "screen.h"
 #include "ui.h"
@@ -87,6 +89,25 @@ int main(int argc, char **argv) {
     char lp[512];
     snprintf(lp, sizeof lp, "%s/.fritax-shell.log", home ? home : "/tmp");
     fx_drm_log_path(lp); fx_inputs_log_path(lp);
+
+    /* Un seul bureau a la fois. La carte graphique n'accepte qu'un maitre :
+       un deuxieme bureau se verrait refuser chaque image, et on chercherait
+       longtemps pourquoi. On le dit tout de suite, clairement. */
+    int verrou = open("/tmp/fritax-shell.pid", O_RDWR | O_CREAT, 0644);
+    if (verrou >= 0 && flock(verrou, LOCK_EX | LOCK_NB) != 0) {
+        char buf[32] = {0};
+        if (read(verrou, buf, sizeof buf - 1) > 0 && atoi(buf) > 0)
+            fprintf(stderr, "fritax-shell: un bureau tourne deja (pid %d), "
+                            "rien a faire\n", atoi(buf));
+        else
+            fprintf(stderr, "fritax-shell: un bureau tourne deja, rien a faire\n");
+        close(verrou);
+        return 3;
+    }
+    if (verrou >= 0) {
+        ftruncate(verrou, 0);
+        dprintf(verrou, "%d\n", (int)getpid());
+    }
 
     drm = fx_drm_open(card);
     if (!drm) { fprintf(stderr, "fritax-shell: pas d'affichage DRM (%s)\n", card); return 1; }
