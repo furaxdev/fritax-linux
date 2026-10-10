@@ -1,0 +1,20 @@
+# Fritax Linux - quel programme tourne sur quelle console.
+
+# Le bureau graphique est la session principale. On ne met AUCUN getty sur la
+# console de l'ecran : sinon il ecrit du texte sur la meme console que le
+# bureau, et l'ecran devient un melange illisible des deux.
+
+# Aucune ligne "tty1" ici, et c'est volontaire.
+
+::sysinit:/etc/init.d/rcS
+
+# Console de secours sur le port serie : c'est par la que les tests parlent a
+# la machine, et ca reste le moyen de reprendre la main si l'affichage casse.
+ttyS0::respawn:/sbin/getty -L ttyS0 115200 vt100
+
+# Console de secours sur la deuxieme console virtuelle (Alt+F2).
+tty2::respawn:/sbin/getty -L tty2 38400 vt100
+
+::ctrlaltdel:/sbin/reboot
+::shutdown:/etc/init.d/rcK
+::restart:/sbin/init

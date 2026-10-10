@@ -65,5 +65,6 @@ jobs:
           name: captures-demarrage
           path: |
             /tmp/captures/*.png
+            /tmp/captures/*.txt
             /tmp/qemu-console.log
           if-no-files-found: warn

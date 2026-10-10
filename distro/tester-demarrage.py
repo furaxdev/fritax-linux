@@ -1,33 +1,43 @@
 #!/usr/bin/env python3
 """
-Demarre l'ISO Fritax Linux dans QEMU, sans ecran, et prend des captures.
+Verifie le demarrage de l'ISO Fritax Linux dans QEMU, sans ecran.
 
-Le principe : on lance QEMU en mode "aucun affichage" mais avec une prise de
-commande QMP. Par cette prise on peut, a tout moment :
-  - prendre une capture de ce que la machine affiche (screendump),
-  - appuyer sur des touches (send-key), comme si on tapait au clavier.
-C'est ce qui permet de verifier le demarrage, l'ecran de connexion puis le
-bureau, sans avoir la machine sous la main.
+Methode : on donne a la machine un port serie, et on lui parle par la. On
+envoie les commandes en texte, on lit les reponses en texte. Plus besoin de
+simuler un clavier francais ni de dechiffrer des captures d'ecran : tout est
+lisible, et en cas d'echec on sait enfin ce que la machine a dit.
+
+On garde malgre tout des captures d'ecran, parce que la seule facon de savoir
+si un bureau graphique s'affiche vraiment, c'est de le regarder.
 
 Usage : tester-demarrage.py <iso> <dossier-de-sortie>
 """
-import json, os, socket, subprocess, sys, time
+
+import json
+import os
+import socket
+import subprocess
+import sys
+import time
 
 ISO = sys.argv[1] if len(sys.argv) > 1 else "fritax-linux.iso"
 SORTIE = sys.argv[2] if len(sys.argv) > 2 else "/tmp/captures"
-SOCK = "/tmp/qemu-qmp.sock"
-JOURNAL = "/tmp/qemu-console.log"
+SERIE = "/tmp/qemu-serie.sock"
+PRISE = "/tmp/qemu-qmp.sock"
 
 os.makedirs(SORTIE, exist_ok=True)
-if os.path.exists(SOCK):
-    os.remove(SOCK)
+for chemin in (SERIE, PRISE):
+    if os.path.exists(chemin):
+        os.remove(chemin)
+
+TOUT = []            # tout ce que la machine a repondu, dans l'ordre
 
 
 def journalise(message):
     print("  " + message, flush=True)
 
 
-# ---------------------------------------------------------------- QEMU
+# ---------------------------------------------------------------- la machine
 qemu = subprocess.Popen([
     "qemu-system-x86_64",
     "-m", "2048",
@@ -35,169 +45,144 @@ qemu = subprocess.Popen([
     "-boot", "d",
     "-display", "none",
     "-vga", "std",
-    "-serial", "file:" + JOURNAL,
-    "-qmp", "unix:%s,server,nowait" % SOCK,
+    "-serial", "unix:%s,server,nowait" % SERIE,
+    "-qmp", "unix:%s,server,nowait" % PRISE,
     "-no-reboot",
 ], stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)
-journalise("QEMU lance (PID %d)" % qemu.pid)
+journalise("machine lancee (pid %d)" % qemu.pid)
 
 
-def prise():
-    """Se connecte a la prise de commande QMP."""
-    for _ in range(60):
+def connecter(chemin, delai=90):
+    for _ in range(delai):
         try:
             s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-            s.connect(SOCK)
-            f = s.makefile("rw")
-            f.readline()                       # message d'accueil
-            f.write(json.dumps({"execute": "qmp_capabilities"}) + "\n")
-            f.flush()
-            f.readline()
-            return f
+            s.connect(chemin)
+            s.settimeout(0.4)
+            return s
         except Exception:
             time.sleep(1)
-    raise SystemExit("impossible de se connecter a QEMU")
+    raise SystemExit("connexion impossible : " + chemin)
 
 
-f = prise()
-journalise("prise de commande connectee")
+serie = connecter(SERIE)
+journalise("console serie connectee")
 
 
-def commande(nom, **arguments):
-    f.write(json.dumps({"execute": nom, "arguments": arguments}) + "\n")
-    f.flush()
-    return f.readline()
+def lire(secondes=2):
+    """Lit tout ce que la machine envoie pendant N secondes."""
+    fin = time.time() + secondes
+    morceaux = []
+    while time.time() < fin:
+        try:
+            donnees = serie.recv(8192)
+            if not donnees:
+                break
+            morceaux.append(donnees)
+            fin = time.time() + 0.4        # on prolonge tant qu'il arrive du texte
+        except socket.timeout:
+            continue
+    texte = b"".join(morceaux).decode("utf-8", "replace")
+    if texte:
+        TOUT.append(texte)
+    return texte
+
+
+def ecrire(texte):
+    """Envoie une ligne a la machine, comme au clavier."""
+    serie.sendall(texte.encode())
+    time.sleep(0.4)
+
+
+def attendre(motif, maximum=240, quoi=""):
+    """Attend un motif dans ce que la machine raconte."""
+    debut = time.time()
+    vu = ""
+    while time.time() - debut < maximum:
+        vu += lire(2)
+        if motif in vu:
+            journalise("vu : %s%s" % (motif, (" (" + quoi + ")") if quoi else ""))
+            return True
+    journalise("PAS VU : %s%s" % (motif, (" (" + quoi + ")") if quoi else ""))
+    return False
+
+
+def commande(texte, attente=4):
+    journalise("$ " + texte)
+    ecrire(texte + "\n")
+    return lire(attente)
+
+
+# ------------------------------------------------------- captures d'ecran
+def prise_qmp():
+    try:
+        s = connecter(PRISE, 30)
+        f = s.makefile("rw")
+        f.readline()
+        f.write(json.dumps({"execute": "qmp_capabilities"}) + "\n")
+        f.flush()
+        f.readline()
+        return f
+    except Exception:
+        return None
+
+
+qmp = prise_qmp()
 
 
 def capture(nom):
+    if not qmp:
+        return
     chemin = os.path.join(SORTIE, nom + ".ppm")
-    commande("screendump", filename=chemin)
-    journalise("capture : " + nom)
-
-
-def taper(texte, pause=0.06):
-    """Envoie du texte touche par touche.
-
-    Attention : la console de Fritax est en AZERTY (le script S10clavier charge
-    la disposition francaise). Or QEMU envoie des *positions* de touches d'un
-    clavier americain. Il faut donc traduire chaque caractere voulu vers la
-    touche qui le produit reellement sur un clavier francais — sinon "cat"
-    devient "cqt" et le mot de passe "fritax" devient "fritqx".
-    """
-    # lettres deplacees par l'AZERTY
-    deplace = {"a": "q", "q": "a", "z": "w", "w": "z", "m": "semicolon"}
-    # caracteres obtenus par une autre touche (avec ou sans majuscule).
-    # Sur un clavier francais, ">" et "<" sont sur la touche supplementaire a
-    # cote du shift gauche (que QEMU appelle "less"), et "&" est la touche "1"
-    # sans majuscule.
-    autres = {
-        " ": ("spc", False), "/": ("dot", True), ".": ("comma", True),
-        "-": ("6", False), "=": ("equal", False), "_": ("8", False),
-        "'": ("4", False), ":": ("dot", False), "&": ("1", False),
-        ">": ("less", True), "<": ("less", False), ";": ("comma", False),
-    }
-    for c in texte:
-        if c.isdigit():
-            # sur un clavier francais, les chiffres sont en Majuscule
-            commande("send-key", keys=[{"type": "qcode", "data": "shift"},
-                                       {"type": "qcode", "data": c}])
-            time.sleep(pause)
-            continue
-        if c in deplace:
-            commande("send-key", keys=[{"type": "qcode", "data": deplace[c]}])
-        elif c in autres:
-            touche, maj = autres[c]
-            suite = ([{"type": "qcode", "data": "shift"}] if maj else []) + \
-                    [{"type": "qcode", "data": touche}]
-            commande("send-key", keys=suite)
-        else:
-            commande("send-key", keys=[{"type": "qcode", "data": c}])
-        time.sleep(pause)
-
-
-def entree():
-    commande("send-key", keys=[{"type": "qcode", "data": "ret"}])
-
-
-def attente(secondes, quoi=""):
-    journalise("attente %ds %s" % (secondes, quoi))
-    time.sleep(secondes)
+    try:
+        qmp.write(json.dumps({"execute": "screendump",
+                              "arguments": {"filename": chemin}}) + "\n")
+        qmp.flush()
+        qmp.readline()
+        journalise("capture : " + nom)
+    except Exception as e:
+        journalise("capture impossible : %s" % e)
 
 
 try:
-    # 1) demarrage : menu d'amorcage puis noyau
-    attente(45, "(demarrage)")
-    capture("01-demarrage")
+    # 1) demarrage : menu d'amorcage, noyau, init
+    attendre("login:", 300, "invite de connexion")
+    capture("01-invite-de-connexion")
 
-    # 2) chargement du systeme en memoire, arrivee sur l'invite de connexion
-    attente(75, "(connexion)")
-    capture("02-invite-de-connexion")
+    commande("root")
+    attendre("Password:", 60, "demande de mot de passe")
+    commande("fritax")
+    attendre("#", 60, "invite du shell")
+    capture("02-shell-obtenu")
 
-    # 3) on se connecte en root au prompt texte, pour pouvoir diagnostiquer
-    journalise("connexion root")
-    taper("root"); entree()
-    attente(8)
-    taper("fritax"); entree()
-    attente(10)
-    capture("03-shell-obtenu")
+    # 2) qui tourne, et sur quelle carte ?
+    commande("ps")
+    capture("03-processus")
 
-    # 4) pourquoi l'ecran de connexion graphique ne prend-il pas la main ?
-    journalise("lecture du journal de l'ecran de connexion")
-    taper("cat /var/log/fritax-login.log"); entree()
-    attente(6)
-    capture("04-journal-ecran-de-connexion")
+    # 3) le bureau a-t-il pris l'affichage ?
+    commande("ls -l /dev/dri")
+    capture("04-peripheriques")
 
-    # 5) les peripheriques dont nos programmes ont besoin sont-ils la ?
-    journalise("verification des peripheriques")
-    taper("ls -l /dev/dri /dev/input"); entree()
-    attente(6)
-    capture("05-peripheriques")
+    # 4) son journal, du debut et de la fin
+    commande("head -30 /var/log/fritax-shell.log")
+    capture("05-journal-debut")
+    commande("tail -30 /var/log/fritax-shell.log")
+    capture("06-journal-fin")
 
-    # 6) Le bureau demarre TOUT SEUL au demarrage depuis le correctif. On ne le
-    #    lance donc pas ici : un deuxieme bureau se disputerait la carte
-    #    graphique avec le premier et le test conclurait a un faux echec — c'est
-    #    exactement ce qui s'est produit au test #12, ou le journal accusait
-    #    deux pid pour le meme programme.
-    journalise("qui tourne ? (le bureau doit etre la, une seule fois)")
-    taper("ps"); entree()
-    attente(8)
-    capture("06-processus-en-cours")
+    # 5) le bureau tient-il dans le temps ?
+    time.sleep(15)
+    capture("07-bureau-apres-15-secondes")
+    commande("ps")
+    capture("08-processus-apres")
 
-    # 7) Le journal du bureau. On lit le DEBUT et la FIN : le debut dit si la
-    #    carte a ete prise et la console detachee, la fin dit si l'affichage a
-    #    ete accepte.
-    journalise("journal du bureau : debut")
-    taper("head -30 /var/log/fritax-shell.log"); entree()
-    attente(6)
-    capture("07-journal-debut")
-
-    journalise("journal du bureau : fin")
-    taper("tail -30 /var/log/fritax-shell.log"); entree()
-    attente(6)
-    capture("08-journal-fin")
-
-    # 8) On arrete le bureau : la console texte doit revenir.
-    journalise("arret du bureau, la console doit revenir")
-    taper("killall fritax-shell"); entree()
-    attente(8)
-    capture("09-apres-arret-du-bureau")
 finally:
+    # On ecrit tout ce que la machine a dit : c'est le document le plus utile
+    # du test, et il est lisible sans rien deviner.
+    with open(os.path.join(SORTIE, "console.txt"), "w", errors="replace") as f:
+        f.write("".join(TOUT))
+    journalise("console enregistree (%d caracteres)" % len("".join(TOUT)))
+
     qemu.terminate()
     try:
         qemu.wait(timeout=20)
     except Exception:
         qemu.kill()
-
-# la console du noyau, ecrite sur le port serie : tres utile si rien ne s'affiche
-if os.path.exists(JOURNAL):
-    with open(JOURNAL, "r", errors="replace") as fh:
-        lignes = fh.read().splitlines()[-40:]
-    print("\n  --- 40 dernieres lignes de la console ---")
-    for l in lignes:
-        print("  " + l)
-else:
-    print("\n  (aucune sortie console)")
-
-print("\n  captures dans :", SORTIE)
-for n in sorted(os.listdir(SORTIE)):
-    print("   ", n)
