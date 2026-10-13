@@ -94,12 +94,17 @@ def ecrire(texte):
 
 
 def attendre(motif, maximum=240, quoi=""):
-    """Attend un motif dans ce que la machine raconte."""
+    """Attend un motif dans ce que la machine raconte.
+
+    On cherche dans TOUT l'historique, pas seulement dans ce qui vient
+    d'arriver : le texte suivant arrive souvent colle au precedent dans le meme
+    paquet, donc il est deja consomme par l'attente d'avant et on l'attendrait
+    pour rien — jusqu'au delai du systeme, qui expirait avant nous.
+    """
     debut = time.time()
-    vu = ""
     while time.time() - debut < maximum:
-        vu += lire(2)
-        if motif in vu:
+        lire(2)
+        if motif in "".join(TOUT):
             journalise("vu : %s%s" % (motif, (" (" + quoi + ")") if quoi else ""))
             return True
     journalise("PAS VU : %s%s" % (motif, (" (" + quoi + ")") if quoi else ""))
@@ -149,9 +154,9 @@ try:
     capture("01-invite-de-connexion")
 
     commande("root")
-    attendre("Password:", 60, "demande de mot de passe")
+    attendre("Password:", 25, "demande de mot de passe")
     commande("fritax")
-    attendre("#", 60, "invite du shell")
+    attendre("#", 25, "invite du shell")
     capture("02-shell-obtenu")
 
     # 2) qui tourne, et sur quelle carte ?
